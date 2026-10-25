@@ -1,98 +1,134 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="bn">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Job Tracker</title>
-<style>
-:root{--bg:#f3f6fb;--card:#fff;--pri:#1f4e79;--txt:#1d2733;--mut:#6b7785;--bd:#dbe3ee}
-*{box-sizing:border-box}
-body{margin:0;font-family:"Nirmala UI","Noto Sans Bengali",system-ui,sans-serif;background:var(--bg);color:var(--txt)}
-header{background:var(--pri);color:#fff;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:5}
-header h1{font-size:18px;margin:0}
-button{font:inherit;cursor:pointer;border:0;border-radius:8px;padding:9px 14px;background:var(--pri);color:#fff}
-button.sec{background:#e6edf6;color:var(--pri)} button.red{background:#c0392b}
-input,select,textarea{font:inherit;width:100%;padding:9px;border:1px solid var(--bd);border-radius:8px;background:#fff}
-textarea{min-height:90px}
-.wrap{max-width:900px;margin:0 auto;padding:14px}
-#login{min-height:100vh;display:flex;align-items:center;justify-content:center}
-#login .box{background:var(--card);padding:28px;border-radius:14px;width:300px;text-align:center;box-shadow:0 4px 20px #0001}
-.bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
-.bar input{flex:2;min-width:150px}.bar select{flex:1;min-width:130px}
-.stats{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
-.stat{background:var(--card);border-radius:10px;padding:8px 12px;font-size:13px;border:1px solid var(--bd)}
-.stat b{display:block;font-size:18px;color:var(--pri)}
-.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:10px}
-.card h3{margin:0 0 2px;font-size:16px}.card .org{color:var(--mut);margin-bottom:8px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px 12px;font-size:13.5px}
-.grid span{color:var(--mut);display:block;font-size:12px}
-.row2{display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap}
-.row2 select{width:auto;flex:1}
-.warn{color:#c0392b;font-weight:700}
-dialog{border:0;border-radius:14px;padding:18px;width:min(560px,94vw);max-height:92vh}
-dialog::backdrop{background:#0006}
-.f{display:grid;grid-template-columns:1fr 1fr;gap:8px}.f label{font-size:12px;color:var(--mut)}
-.f .full{grid-column:1/-1}
-#msg{color:#c0392b;font-size:13px;min-height:18px}
-.empty{text-align:center;color:var(--mut);padding:40px}
-</style>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script>tailwind.config={theme:{extend:{fontFamily:{sans:['Hind Siliguri','Nirmala UI','sans-serif']}}}}</script>
+<style>body{font-family:'Hind Siliguri','Nirmala UI',sans-serif}</style>
 </head>
-<body>
+<body class="bg-slate-50 text-slate-800 min-h-screen pb-12">
 
-<div id="login">
-  <div class="box">
-    <div style="font-size:40px">🔒</div>
-    <h2 style="margin:6px 0 14px">Job Tracker</h2>
-    <input id="pw" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
-    <div id="msg"></div>
-    <button onclick="doLogin()" style="width:100%">Enter</button>
+<!-- Login -->
+<div id="login" class="min-h-screen flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-lg p-8 w-full max-w-xs text-center">
+    <div class="text-5xl mb-2">🔒</div>
+    <h2 class="text-lg font-bold mb-4">Job Tracker</h2>
+    <input id="pw" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()"
+      class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none mb-2">
+    <div id="msg" class="text-rose-600 text-sm min-h-[20px]"></div>
+    <button onclick="doLogin()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg py-2 font-medium">Enter</button>
   </div>
 </div>
 
-<div id="app" style="display:none">
-  <header><h1>📋 চাকরি ট্র্যাকার</h1>
-    <div><button class="sec" onclick="openAdd()">+ নতুন</button> <button class="sec" onclick="logout()">Logout</button></div>
-  </header>
-  <div class="wrap">
-    <div class="stats" id="stats"></div>
-    <div class="bar">
-      <input id="q" placeholder="প্রতিষ্ঠান / পদ দিয়ে খুঁজুন" oninput="render()">
-      <select id="fs" onchange="render()"></select>
+<div id="app" class="hidden">
+<header class="bg-indigo-700 text-white shadow-md sticky top-0 z-30">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+    <div class="flex items-center gap-3">
+      <div class="p-2 bg-indigo-600 rounded-lg"><i class="fa-solid fa-briefcase text-xl"></i></div>
+      <div><h1 class="text-lg sm:text-xl font-bold">চাকরি আবেদন ট্র্যাকার</h1>
+        <p class="text-xs text-indigo-200 hidden sm:block">প্রিলি · লিখিত · ভাইভা সব এক জায়গায়</p></div>
     </div>
-    <div id="list"></div>
+    <div class="flex gap-2">
+      <button onclick="openAdd()" class="bg-emerald-500 hover:bg-emerald-600 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
+        <i class="fa-solid fa-plus"></i><span>নতুন আবেদন</span></button>
+      <button onclick="logout()" class="bg-indigo-600 hover:bg-indigo-500 px-3 py-2 rounded-lg text-sm" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></button>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-4 mt-5">
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5" id="stats"></div>
+
+  <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm mb-5 flex flex-col md:flex-row gap-3 justify-between">
+    <div class="relative w-full md:w-96">
+      <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+      <input id="q" oninput="render()" placeholder="প্রতিষ্ঠান বা পদ দিয়ে খুঁজুন..."
+        class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+    </div>
+    <div class="flex gap-2">
+      <select id="fs" onchange="render()" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"></select>
+      <button onclick="reload()" class="px-3 py-2 border border-slate-300 hover:bg-slate-100 rounded-lg text-sm"><i class="fa-solid fa-rotate"></i></button>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-sm">
+        <thead><tr class="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
+          <th class="p-3">#</th><th class="p-3">প্রতিষ্ঠান</th><th class="p-3">পদ</th>
+          <th class="p-3">আবেদন</th><th class="p-3">শেষ তারিখ</th><th class="p-3">পরবর্তী ধাপ</th>
+          <th class="p-3">স্ট্যাটাস</th><th class="p-3 text-center">অ্যাকশন</th>
+        </tr></thead>
+        <tbody id="tbody" class="divide-y divide-slate-200"></tbody>
+      </table>
+    </div>
+    <div id="empty" class="hidden p-8 text-center text-slate-500"><i class="fa-regular fa-folder-open text-4xl mb-2 text-slate-300"></i><p>কোনো তথ্য পাওয়া যায়নি!</p></div>
+    <div id="loading" class="p-8 text-center text-slate-500">লোড হচ্ছে...</div>
+  </div>
+</main>
+</div>
+
+<!-- Add / Edit modal -->
+<div id="jobModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center z-50 p-3">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-xl max-h-[94vh] flex flex-col overflow-hidden">
+    <div class="bg-indigo-700 px-5 py-3 text-white flex justify-between items-center">
+      <h3 id="mTitle" class="text-lg font-bold">নতুন আবেদন</h3>
+      <button onclick="closeModal()" class="text-indigo-200 hover:text-white text-xl"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="p-5 overflow-y-auto space-y-4">
+      <div id="aiBox" class="bg-indigo-50 border border-indigo-100 rounded-xl p-3">
+        <label class="block text-xs font-semibold text-slate-600 mb-1">সার্কুলারের PDF / ছবি দিন, তারপর ক্রমিক নং লিখুন</label>
+        <input id="file" type="file" accept="application/pdf,image/*" class="w-full text-sm mb-2">
+        <div class="flex gap-2">
+          <input id="serial" inputmode="numeric" placeholder="ক্রমিক নং (যেমন 3)" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm">
+          <button id="rbtn" onclick="readCircular()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">পড়ো ও বসাও</button>
+        </div>
+        <div id="rmsg" class="text-xs text-slate-500 mt-2"></div>
+        <div id="plist" class="mt-1 flex flex-wrap gap-1"></div>
+      </div>
+      <form id="form" class="grid grid-cols-1 sm:grid-cols-2 gap-3" onsubmit="save(event)"></form>
+    </div>
+    <div class="px-5 py-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+      <button onclick="closeModal()" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-100 text-sm">বাতিল</button>
+      <button id="sbtn" onclick="save()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">সংরক্ষণ করুন</button>
+    </div>
   </div>
 </div>
 
-<dialog id="dlg">
-  <h3 style="margin-top:0">নতুন আবেদন</h3>
-  <div style="background:#eef4fb;border-radius:10px;padding:10px;margin-bottom:12px">
-    <label style="font-size:12px;color:#6b7785">সার্কুলারের PDF / ছবি দিন, তারপর ক্রমিক নং লিখুন</label>
-    <input id="file" type="file" accept="application/pdf,image/*" style="margin:6px 0">
-    <div style="display:flex;gap:8px">
-      <input id="serial" placeholder="ক্রমিক নং (যেমন 3)" inputmode="numeric" style="flex:1">
-      <button onclick="readCircular()" id="rbtn">পড়ো ও বসাও</button>
+<!-- Details modal -->
+<div id="dModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center z-50 p-3">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[92vh] flex flex-col overflow-hidden">
+    <div class="bg-slate-800 px-5 py-3 text-white flex justify-between items-center">
+      <h3 class="text-lg font-bold">আবেদনের বিবরণ</h3>
+      <button onclick="closeD()" class="text-slate-300 hover:text-white text-xl"><i class="fa-solid fa-xmark"></i></button>
     </div>
-    <div id="rmsg" style="font-size:13px;margin-top:6px;color:#6b7785"></div>
-    <div id="plist" style="margin-top:6px"></div>
+    <div class="p-5 space-y-3 overflow-y-auto" id="dBody"></div>
   </div>
-  <label style="font-size:12px;color:#6b7785">অথবা হাতে পেস্ট করুন ("কলাম: মান" লাইন)</label>
-  <textarea id="paste" placeholder="প্রতিষ্ঠান: ...&#10;পদ: ...&#10;গ্রেড: ..."></textarea>
-  <button class="sec" style="margin:6px 0 12px" onclick="parsePaste()">⬇ ঘরে বসাও</button>
-  <div class="f" id="form"></div>
-  <div class="row2" style="justify-content:flex-end">
-    <button class="sec" onclick="dlg.close()">বাতিল</button>
-    <button onclick="save()">সেভ</button>
-  </div>
-</dialog>
+</div>
 
 <script>
-// ====== Apps Script Web app URL ekhane boshan ======
+// ====== Apps Script Web app URL ======
 const API = 'https://script.google.com/macros/s/AKfycbxULpKXBeC4jiD6q-ZxxAwoQHyLEm37_W-8iFS8osZcFVnYISZlhma_hNUyr5xF1bqu/exec';
-// ===================================================
-const FIELDS = ['প্রতিষ্ঠান','পদ','গ্রেড','বেতন','শূন্যপদ','কোথা থেকে আবেদন','আবেদনের তারিখ','শেষ তারিখ','ফি','User ID','পরীক্ষার তারিখ','লিংক','নোট'];
-const DATES = ['আবেদনের তারিখ','শেষ তারিখ','পরীক্ষার তারিখ'];
-let rows = [], statuses = [], pw = sessionStorage.getItem('jt_pw') || '';
+// =====================================
+const FIELDS = [
+  ['প্রতিষ্ঠান','text',1],['পদ','text',1],['গ্রেড','text'],['বেতন','text'],['শূন্যপদ','text'],['ফি','text'],
+  ['কোথা থেকে আবেদন','text',1],['আবেদনের তারিখ','date'],['শেষ তারিখ','date'],['User ID','text'],['স্ট্যাটাস','select'],
+  ['প্রিলি তারিখ','date'],['লিখিত তারিখ','date'],['ভাইভা তারিখ','date'],['লিংক','text',1],['নোট','textarea',1]
+];
+const STAGES = [['প্রিলি','প্রিলি তারিখ'],['লিখিত','লিখিত তারিখ'],['ভাইভা','ভাইভা তারিখ']];
+const BADGE = {
+  'আবেদন করেছি':'bg-amber-100 text-amber-800','অ্যাডমিট কার্ড এসেছে':'bg-sky-100 text-sky-800',
+  'প্রিলি':'bg-violet-100 text-violet-800','লিখিত':'bg-blue-100 text-blue-800','ব্যবহারিক':'bg-teal-100 text-teal-800',
+  'ভাইভা':'bg-orange-100 text-orange-800','নির্বাচিত':'bg-emerald-100 text-emerald-800','বাদ':'bg-rose-100 text-rose-800'
+};
+let rows = [], statuses = [], pw = sessionStorage.getItem('jt_pw') || '', editId = '';
+let circular = null, circularKey = '';
 const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 async function call(body) {
   const r = await fetch(API, {method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({password: pw, ...body})});
@@ -107,72 +143,126 @@ async function doLogin() {
 }
 function start(d) {
   rows = d.rows; statuses = d.statuses;
-  $('login').style.display = 'none'; $('app').style.display = 'block';
+  $('login').classList.add('hidden'); $('app').classList.remove('hidden');
   $('fs').innerHTML = '<option value="">সব স্ট্যাটাস</option>' + statuses.map(s => `<option>${s}</option>`).join('');
   buildForm(); render();
 }
 function logout() { sessionStorage.removeItem('jt_pw'); location.reload(); }
-async function reload() { const d = await call({action:'list'}); if (d.ok) { rows = d.rows; render(); } }
+async function reload() { $('loading').classList.remove('hidden'); const d = await call({action:'list'}); if (d.ok) { rows = d.rows; render(); } }
 
 function days(s) { if (!s) return null; const d = new Date(s); if (isNaN(d)) return null;
   const t = new Date(); t.setHours(0,0,0,0); return Math.round((d - t) / 864e5); }
-function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function bd(s) { if (!s) return '—'; const d = new Date(s); return isNaN(d) ? esc(s) : d.toLocaleDateString('bn-BD', {day:'2-digit', month:'2-digit', year:'numeric'}); }
+function left(x) { return x === null ? '' : x < 0 ? '' : x === 0 ? 'আজ' : x + ' দিন বাকি'; }
+function nextStage(r) {
+  const l = STAGES.map(([n, k]) => ({n, s: r[k], d: days(r[k])})).filter(x => x.d !== null && x.d >= 0);
+  l.sort((a, b) => a.d - b.d); return l[0];
+}
 
 function render() {
+  $('loading').classList.add('hidden');
   const q = $('q').value.trim().toLowerCase(), fs = $('fs').value;
-  const list = rows.filter(r => (!fs || r['স্ট্যাটাস'] === fs) &&
-    (!q || (r['প্রতিষ্ঠান'] + ' ' + r['পদ']).toLowerCase().includes(q))).reverse();
-  const cnt = s => rows.filter(r => r['স্ট্যাটাস'] === s).length;
-  $('stats').innerHTML = `<div class="stat">মোট<b>${rows.length}</b></div>` +
-    ['লিখিত পরীক্ষা','ভাইভা','নির্বাচিত'].map(s => `<div class="stat">${s}<b>${cnt(s)}</b></div>`).join('');
-  $('list').innerHTML = list.length ? list.map(card).join('') : '<div class="empty">কিছু পাওয়া যায়নি</div>';
+  const list = rows.filter(r => (!fs || r['স্ট্যাটাস'] === fs) && (!q || (r['প্রতিষ্ঠান'] + ' ' + r['পদ']).toLowerCase().includes(q))).reverse();
+  const c = a => rows.filter(r => a.includes(r['স্ট্যাটাস'])).length;
+  const card = (ic, col, t, n) => `<div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
+    <div class="p-3 ${col} rounded-lg text-lg"><i class="fa-solid ${ic}"></i></div>
+    <div><p class="text-xs text-slate-500">${t}</p><h3 class="text-xl font-bold">${n}</h3></div></div>`;
+  $('stats').innerHTML =
+    card('fa-paper-plane','bg-blue-100 text-blue-600','মোট আবেদন', rows.length) +
+    card('fa-clock','bg-amber-100 text-amber-600','আবেদনকৃত', c(['আবেদন করেছি','অ্যাডমিট কার্ড এসেছে'])) +
+    card('fa-user-graduate','bg-purple-100 text-purple-600','প্রিলি/লিখিত/ভাইভা', c(['প্রিলি','লিখিত','ব্যবহারিক','ভাইভা'])) +
+    card('fa-circle-check','bg-emerald-100 text-emerald-600','নির্বাচিত', c(['নির্বাচিত']));
+  $('empty').classList.toggle('hidden', list.length > 0);
+  $('tbody').innerHTML = list.map((r, i) => {
+    const dl = days(r['শেষ তারিখ']), ns = nextStage(r), st = r['স্ট্যাটাস'];
+    const dlWarn = dl !== null && dl >= 0 && dl <= 3 && st === 'আবেদন করেছি' ? 'text-rose-600 font-bold' : 'text-slate-600';
+    return `<tr class="hover:bg-slate-50">
+      <td class="p-3 text-slate-500">${i + 1}</td>
+      <td class="p-3 font-semibold">${esc(r['প্রতিষ্ঠান'])}</td>
+      <td class="p-3">${esc(r['পদ'])}<div class="text-xs text-slate-500">${esc(r['গ্রেড'] ? 'গ্রেড ' + r['গ্রেড'] : '')}</div></td>
+      <td class="p-3 text-slate-600">${bd(r['আবেদনের তারিখ'])}</td>
+      <td class="p-3 ${dlWarn}">${bd(r['শেষ তারিখ'])}</td>
+      <td class="p-3">${ns ? `<b class="${ns.d <= 3 ? 'text-rose-600' : ''}">${ns.n}</b> · ${bd(ns.s)}<div class="text-xs text-slate-500">${left(ns.d)}</div>` : '<span class="text-slate-400">—</span>'}</td>
+      <td class="p-3"><select onchange="setStatus('${r.id}',this.value)" class="text-xs font-semibold rounded-full px-2 py-1 border-0 ${BADGE[st] || 'bg-slate-100'}">
+        ${statuses.map(s => `<option${s === st ? ' selected' : ''}>${s}</option>`).join('')}</select></td>
+      <td class="p-3 text-center whitespace-nowrap">
+        <button onclick="view('${r.id}')" class="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-md" title="বিস্তারিত"><i class="fa-solid fa-eye"></i></button>
+        <button onclick="openEdit('${r.id}')" class="p-1.5 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-md" title="এডিট"><i class="fa-solid fa-pen-to-square"></i></button>
+        <button onclick="del('${r.id}')" class="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-md" title="ডিলিট"><i class="fa-solid fa-trash"></i></button>
+      </td></tr>`;
+  }).join('');
 }
-function card(r) {
-  const dl = days(r['শেষ তারিখ']), ex = days(r['পরীক্ষার তারিখ']);
-  const warn = x => x !== null && x >= 0 && x <= 3 ? ' warn' : '';
-  const g = (k, extra='') => r[k] ? `<div><span>${k}</span><b class="${extra}">${esc(r[k])}</b></div>` : '';
-  return `<div class="card">
-    <h3>${esc(r['পদ'])}</h3><div class="org">${esc(r['প্রতিষ্ঠান'])}</div>
-    <div class="grid">${g('গ্রেড')}${g('বেতন')}${g('শূন্যপদ')}${g('কোথা থেকে আবেদন')}${g('আবেদনের তারিখ')}
-      ${g('শেষ তারিখ', warn(dl))}${g('ফি')}${g('User ID')}${g('পরীক্ষার তারিখ', warn(ex))}</div>
-    ${r['লিংক'] ? `<div style="margin-top:6px;font-size:13px"><a href="${esc(r['লিংক'])}" target="_blank" rel="noopener">🔗 লিংক</a></div>` : ''}
-    ${r['নোট'] ? `<div style="margin-top:6px;font-size:13px;color:#6b7785">📝 ${esc(r['নোট'])}</div>` : ''}
-    <div class="row2">
-      <select onchange="upd('${r.id}','স্ট্যাটাস',this.value)">${statuses.map(s => `<option${s===r['স্ট্যাটাস']?' selected':''}>${s}</option>`).join('')}</select>
-      <input type="date" value="${esc(r['পরীক্ষার তারিখ'])}" title="পরীক্ষার তারিখ" style="width:auto" onchange="upd('${r.id}','পরীক্ষার তারিখ',this.value)">
-      <button class="red" onclick="del('${r.id}')">মুছুন</button>
-    </div></div>`;
-}
-async function upd(id, k, v) {
-  const r = rows.find(x => x.id === id); if (r) r[k] = v;
-  await call({action:'update', id, fields:{[k]:v}}); render();
+async function setStatus(id, v) {
+  const r = rows.find(x => x.id === id); if (r) r['স্ট্যাটাস'] = v; render();
+  await call({action:'update', id, fields:{'স্ট্যাটাস': v}});
 }
 async function del(id) {
   if (!confirm('মুছে ফেলবেন?')) return;
-  await call({action:'delete', id}); rows = rows.filter(x => x.id !== id); render();
+  rows = rows.filter(x => x.id !== id); render();
+  await call({action:'delete', id});
 }
+function view(id) {
+  const r = rows.find(x => x.id === id); if (!r) return;
+  const item = (t, v) => `<div><span class="text-xs text-slate-500 font-semibold block">${t}</span><p class="text-slate-800">${v || '—'}</p></div>`;
+  $('dBody').innerHTML =
+    `<div><span class="text-xs text-slate-500 font-semibold block">প্রতিষ্ঠান</span><p class="font-bold text-lg">${esc(r['প্রতিষ্ঠান'])}</p></div>` +
+    item('পদ', esc(r['পদ'])) +
+    `<div class="grid grid-cols-2 gap-3">${item('গ্রেড', esc(r['গ্রেড']))}${item('বেতন', esc(r['বেতন']))}${item('শূন্যপদ', esc(r['শূন্যপদ']))}${item('ফি', esc(r['ফি']))}</div>` +
+    item('কোথা থেকে আবেদন', esc(r['কোথা থেকে আবেদন'])) +
+    `<div class="grid grid-cols-2 gap-3">${item('আবেদনের তারিখ', bd(r['আবেদনের তারিখ']))}${item('শেষ তারিখ', bd(r['শেষ তারিখ']))}${item('User ID', esc(r['User ID']))}${item('স্ট্যাটাস', esc(r['স্ট্যাটাস']))}</div>` +
+    `<div class="grid grid-cols-3 gap-3">${STAGES.map(([n, k]) => item(n, bd(r[k]))).join('')}</div>` +
+    item('লিংক', r['লিংক'] ? `<a class="text-indigo-600 underline break-all" target="_blank" rel="noopener" href="${esc(r['লিংক'])}">${esc(r['লিংক'])}</a>` : '') +
+    item('নোট', `<span class="block bg-slate-100 p-2 rounded-lg text-sm whitespace-pre-wrap">${esc(r['নোট'])}</span>`);
+  $('dModal').classList.remove('hidden'); $('dModal').classList.add('flex');
+}
+function closeD() { $('dModal').classList.add('hidden'); $('dModal').classList.remove('flex'); }
 
 function buildForm() {
-  $('form').innerHTML = FIELDS.map(k => {
-    const full = ['প্রতিষ্ঠান','পদ','লিংক','নোট'].includes(k) ? ' full' : '';
-    const t = DATES.includes(k) ? 'date' : 'text';
-    return `<div class="${full}"><label>${k}</label><input data-k="${k}" type="${t}"></div>`;
+  $('form').innerHTML = FIELDS.map(([k, t, full]) => {
+    const cls = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white';
+    let inp;
+    if (t === 'select') inp = `<select data-k="${k}" class="${cls}">${statuses.map(s => `<option>${s}</option>`).join('')}</select>`;
+    else if (t === 'textarea') inp = `<textarea data-k="${k}" rows="2" class="${cls}" placeholder="যা মনে রাখতে চান"></textarea>`;
+    else inp = `<input data-k="${k}" type="${t}" class="${cls}">`;
+    return `<div class="${full ? 'sm:col-span-2' : ''}"><label class="block text-xs font-semibold text-slate-600 mb-1">${k}</label>${inp}</div>`;
   }).join('');
 }
+const fld = k => document.querySelector(`[data-k="${k}"]`);
+function showModal() { $('jobModal').classList.remove('hidden'); $('jobModal').classList.add('flex'); }
+function closeModal() { $('jobModal').classList.add('hidden'); $('jobModal').classList.remove('flex'); }
 function openAdd() {
-  document.querySelectorAll('#form input').forEach(i => i.value = '');
-  document.querySelector('[data-k="আবেদনের তারিখ"]').value = new Date().toISOString().slice(0, 10);
-  $('paste').value = ''; $('dlg').showModal();
+  editId = ''; $('mTitle').textContent = 'নতুন আবেদন'; $('aiBox').classList.remove('hidden');
+  document.querySelectorAll('#form [data-k]').forEach(i => i.value = '');
+  fld('স্ট্যাটাস').value = statuses[0]; fld('আবেদনের তারিখ').value = new Date().toISOString().slice(0, 10);
+  $('serial').value = ''; $('rmsg').textContent = ''; showModal();
 }
-let circular = null, circularFile = '';
+function openEdit(id) {
+  const r = rows.find(x => x.id === id); if (!r) return;
+  editId = id; $('mTitle').textContent = 'আবেদন সংশোধন'; $('aiBox').classList.add('hidden');
+  document.querySelectorAll('#form [data-k]').forEach(i => i.value = r[i.dataset.k] || '');
+  showModal();
+}
+async function save(e) {
+  if (e) e.preventDefault();
+  const data = {}; document.querySelectorAll('#form [data-k]').forEach(i => data[i.dataset.k] = i.value.trim());
+  if (!data['প্রতিষ্ঠান'] && !data['পদ']) { alert('প্রতিষ্ঠান বা পদ লিখুন'); return; }
+  $('sbtn').disabled = true; $('sbtn').textContent = 'সেভ হচ্ছে...';
+  try {
+    const d = editId ? await call({action:'update', id: editId, fields: data}) : await call({action:'add', data});
+    if (d.ok) { closeModal(); await reload(); } else alert('সেভ হয়নি: ' + d.error);
+  } catch (err) { alert('সংযোগ হয়নি'); }
+  $('sbtn').disabled = false; $('sbtn').textContent = 'সংরক্ষণ করুন';
+}
+
+// ===== PDF / chhobi theke auto =====
 function fileToB64(f) {
   return new Promise((res, rej) => {
-    if (f.type.startsWith('image/')) {   // chhobi chhoto kore nei
+    if (f.type.startsWith('image/')) {
       const img = new Image(); img.onload = () => {
         const s = Math.min(1, 1800 / Math.max(img.width, img.height));
         const c = document.createElement('canvas'); c.width = img.width * s; c.height = img.height * s;
         c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-        res({mime: 'image/jpeg', data: c.toDataURL('image/jpeg', 0.85).split(',')[1]});
+        res({mime:'image/jpeg', data: c.toDataURL('image/jpeg', 0.85).split(',')[1]});
       }; img.onerror = rej; img.src = URL.createObjectURL(f);
     } else {
       const fr = new FileReader();
@@ -182,50 +272,43 @@ function fileToB64(f) {
   });
 }
 async function readCircular() {
-  const f = $('file').files[0], sn = $('serial').value.trim().replace(/[০-৯]/g, d => '০১২৩৪৫৬৭৮৯'.indexOf(d));
+  const f = $('file').files[0];
+  const sn = $('serial').value.trim().replace(/[০-৯]/g, d => '০১২৩৪৫৬৭৮৯'.indexOf(d));
   const key = f ? f.name + f.size : '';
-  if (!circular || (f && key !== circularFile)) {
+  if (!circular || (f && key !== circularKey)) {
     if (!f) { $('rmsg').textContent = 'আগে PDF বা ছবি বেছে নিন'; return; }
     if (f.size > 8e6) { $('rmsg').textContent = 'ফাইল ৮MB-এর বেশি, ছোট করে দিন'; return; }
-    $('rbtn').disabled = true; $('rmsg').textContent = 'পড়া হচ্ছে... (১০-৩০ সেকেন্ড)';
-    try {
-      const p = await fileToB64(f);
-      const d = await call({action: 'extract', mime: p.mime, data: p.data});
-      if (!d.ok) { $('rmsg').textContent = 'হয়নি: ' + d.error; $('rbtn').disabled = false; return; }
-      circular = d.circular; circularFile = key;
-    } catch (e) { $('rmsg').textContent = 'সংযোগ বা ফাইলে সমস্যা'; $('rbtn').disabled = false; return; }
-    $('rbtn').disabled = false;
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem('jt_c_' + key) || 'null'); } catch (e) {}
+    if (saved) { circular = saved; circularKey = key; }   // ager pora ache, ekdom druto
+    else {
+      $('rbtn').disabled = true;
+      const t0 = Date.now(), tm = setInterval(() => $('rmsg').textContent = 'পড়া হচ্ছে... ' + Math.round((Date.now() - t0) / 1000) + ' সেকেন্ড (প্রথমবার শুধু, পরে ঝটপট)', 500);
+      try {
+        const p = await fileToB64(f);
+        const d = await call({action:'extract', mime: p.mime, data: p.data});
+        clearInterval(tm);
+        if (!d.ok) { $('rmsg').textContent = 'হয়নি: ' + d.error; $('rbtn').disabled = false; return; }
+        circular = d.circular; circularKey = key;
+        try { localStorage.setItem('jt_c_' + key, JSON.stringify(circular)); } catch (e) {}
+      } catch (e) { clearInterval(tm); $('rmsg').textContent = 'সংযোগ বা ফাইলে সমস্যা'; $('rbtn').disabled = false; return; }
+      $('rbtn').disabled = false;
+    }
   }
   const posts = circular.posts || [];
-  $('plist').innerHTML = posts.map(p => `<button class="sec" style="margin:2px" onclick="pickPost('${esc(p.serial)}')">${esc(p.serial)}. ${esc(p.name)}</button>`).join('');
+  $('plist').innerHTML = posts.map(p => `<button type="button" onclick="pickPost('${esc(p.serial)}')" class="px-2 py-1 bg-white border border-indigo-200 hover:bg-indigo-100 rounded-lg text-xs">${esc(p.serial)}. ${esc(p.name)}</button>`).join('');
   if (sn) pickPost(sn); else $('rmsg').textContent = posts.length + 'টি পদ পাওয়া গেছে, নিচ থেকে বেছে নিন বা ক্রমিক নং লিখুন';
 }
 function pickPost(sn) {
   const p = (circular.posts || []).find(x => String(x.serial).trim() === String(sn).trim());
   if (!p) { $('rmsg').textContent = 'ক্রমিক ' + sn + ' পাওয়া যায়নি, নিচের বোতাম থেকে বেছে নিন'; return; }
-  const set = (k, v) => { if (v) document.querySelector(`[data-k="${k}"]`).value = v; };
+  const set = (k, v) => { if (v) fld(k).value = v; };
   set('প্রতিষ্ঠান', circular.org); set('পদ', p.name); set('গ্রেড', p.grade); set('বেতন', p.salary);
-  set('শূন্যপদ', p.vacancies); set('ফি', p.fee); set('শেষ তারিখ', circular.deadline);
-  set('কোথা থেকে আবেদন', circular.applyUrl);
-  $('rmsg').textContent = '✅ বসানো হয়েছে, একবার মিলিয়ে দেখে User ID দিয়ে সেভ করুন';
-}
-function parsePaste() {
-  $('paste').value.split('\n').forEach(line => {
-    const m = line.match(/^\s*([^:：]+)[:：]\s*(.*)$/); if (!m) return;
-    const key = FIELDS.find(f => f === m[1].trim() || m[1].trim().startsWith(f));
-    if (key) document.querySelector(`[data-k="${key}"]`).value = m[2].trim();
-  });
-}
-async function save() {
-  const data = {};
-  document.querySelectorAll('#form input').forEach(i => data[i.dataset.k] = i.value.trim());
-  if (!data['প্রতিষ্ঠান'] && !data['পদ']) { alert('প্রতিষ্ঠান বা পদ লিখুন'); return; }
-  const d = await call({action:'add', data});
-  if (d.ok) { $('dlg').close(); reload(); } else alert('সেভ হয়নি: ' + d.error);
+  set('শূন্যপদ', p.vacancies); set('ফি', p.fee); set('শেষ তারিখ', circular.deadline); set('কোথা থেকে আবেদন', circular.applyUrl);
+  $('rmsg').textContent = '✅ বসানো হয়েছে। একবার মিলিয়ে দেখুন, User ID দিয়ে সংরক্ষণ করুন';
 }
 
 if (pw) call({action:'list'}).then(d => { if (d.ok) start(d); else sessionStorage.removeItem('jt_pw'); }).catch(() => {});
-const dlg = $('dlg');
 </script>
 </body>
 </html>
