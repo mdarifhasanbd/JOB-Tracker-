@@ -185,10 +185,19 @@ function render() {
   $('tbody').innerHTML = list.map((r, i) => {
     const dl = days(r['শেষ তারিখ']), ns = nextStage(r), st = r['স্ট্যাটাস'];
     const dlWarn = dl !== null && dl >= 0 && dl <= 3 && st === 'আবেদন করেছি' ? 'text-rose-600 font-bold' : 'text-slate-600';
+    
+    // আবেদনের লিংক থাকলে পদের নামের সাথে হাইপারলিংক যুক্ত হবে
+    const postLink = (r['লিংক'] || r['কোথা থেকে আবেদন']);
+    const postTitleHtml = postLink 
+      ? `<a href="${esc(postLink)}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:text-indigo-800 hover:underline font-semibold flex items-center gap-1">
+          ${esc(r['পদ'])} <i class="fa-solid fa-arrow-up-right-from-square text-[10px] opacity-70"></i>
+         </a>`
+      : `<span class="font-semibold text-slate-800">${esc(r['পদ'])}</span>`;
+
     return `<tr class="hover:bg-slate-50">
       <td class="p-3 text-slate-500">${i + 1}</td>
       <td class="p-3 font-semibold">${esc(r['প্রতিষ্ঠান'])}</td>
-      <td class="p-3">${esc(r['পদ'])}<div class="text-xs text-slate-500">${esc(r['গ্রেড'] ? 'গ্রেড ' + r['গ্রেড'] : '')}</div></td>
+      <td class="p-3">${postTitleHtml}<div class="text-xs text-slate-500">${esc(r['গ্রেড'] ? 'গ্রেড ' + r['গ্রেড'] : '')}</div></td>
       <td class="p-3 text-slate-600">${bd(r['আবেদনের তারিখ'])}</td>
       <td class="p-3 ${dlWarn}">${bd(r['শেষ তারিখ'])}</td>
       <td class="p-3">${ns ? `<b class="${ns.d <= 3 ? 'text-rose-600' : ''}">${ns.n}</b> · ${bd(ns.s)}<div class="text-xs text-slate-500">${left(ns.d)}</div>` : '<span class="text-slate-400">—</span>'}</td>
@@ -281,7 +290,7 @@ function fileToB64(f) {
   });
 }
 async function readCircular() {
-  if ($('rbtn').disabled) return;   // pora cholche
+  if ($('rbtn').disabled) return;
   const f = pickedFile;
   const sn = $('serial').value.trim().replace(/[০-৯]/g, d => '০১২৩৪৫৬৭৮৯'.indexOf(d));
   const key = f ? f.name + f.size : '';
@@ -290,7 +299,7 @@ async function readCircular() {
     if (f.size > 8e6) { $('rmsg').textContent = 'ফাইল ৮MB-এর বেশি, ছোট করে দিন'; return; }
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem('jt_c_' + key) || 'null'); } catch (e) {}
-    if (saved) { circular = saved; circularKey = key; }   // ager pora ache, ekdom druto
+    if (saved) { circular = saved; circularKey = key; }
     else {
       $('rbtn').disabled = true;
       const t0 = Date.now(), tm = setInterval(() => $('rmsg').textContent = 'পড়া হচ্ছে... ' + Math.round((Date.now() - t0) / 1000) + ' সেকেন্ড (প্রথমবার শুধু, পরে ঝটপট)', 500);
@@ -315,7 +324,9 @@ function pickPost(sn) {
   if (!p) { $('rmsg').textContent = 'ক্রমিক ' + sn + ' পাওয়া যায়নি, নিচের বোতাম থেকে বেছে নিন'; return; }
   const set = (k, v) => { if (v) fld(k).value = v; };
   set('প্রতিষ্ঠান', circular.org); set('পদ', p.name); set('গ্রেড', p.grade); set('বেতন', p.salary);
-  set('শূন্যপদ', p.vacancies); set('ফি', p.fee); set('শেষ তারিখ', circular.deadline); set('কোথা থেকে আবেদন', circular.applyUrl);
+  set('শূন্যপদ', p.vacancies); set('ফি', p.fee); set('শেষ তারিখ', circular.deadline); 
+  set('কোথা থেকে আবেদন', circular.applyUrl);
+  set('লিংক', circular.applyUrl); // 'লিংক' ফিল্ডেও স্বয়ংক্রিয়ভাবে আবেদনের ইউআরএল সেট করে দেওয়া হলো
   $('rmsg').textContent = '✅ বসানো হয়েছে। একবার মিলিয়ে দেখুন, User ID দিয়ে সংরক্ষণ করুন';
 }
 
@@ -324,7 +335,7 @@ function showPicked() {
   const f = pickedFile;
   $('dropTxt').innerHTML = f ? '📄 <b>' + esc(f.name) + '</b> (' + (f.size / 1024 / 1024).toFixed(1) + ' MB)' : 'PDF / ছবি এখানে <b>টেনে এনে ছাড়ুন</b> অথবা চাপ দিয়ে বেছে নিন';
 }
-function setFile(f) {   // file dhorei sathe sathe pora shuru
+function setFile(f) {
   if (!f) return;
   if (!/pdf|image/.test(f.type)) { $('rmsg').textContent = 'শুধু PDF বা ছবি দিন'; return; }
   pickedFile = f; showPicked(); readCircular();
@@ -336,8 +347,7 @@ $('file').addEventListener('change', e => setFile(e.target.files[0]));
 ['dragleave', 'drop'].forEach(ev => $('drop').addEventListener(ev, e => {
   e.preventDefault(); $('drop').classList.remove('bg-indigo-100', 'border-indigo-600');
 }));
-// drop korle niche er window handler ta file dhore
-// zone er baire chhere dile browser jeno file khule na felе
+
 const hideOv = () => { $('ov').classList.add('hidden'); $('ov').classList.remove('flex'); };
 const loggedIn = () => !$('app').classList.contains('hidden');
 const needNew = () => $('jobModal').classList.contains('hidden') || editId;
@@ -347,14 +357,14 @@ window.addEventListener('dragenter', e => {
 });
 window.addEventListener('dragleave', e => { if (!e.relatedTarget) hideOv(); });
 window.addEventListener('dragover', e => e.preventDefault());
-window.addEventListener('drop', e => {      // jekhanei chhaden, file nebe
+window.addEventListener('drop', e => {
   e.preventDefault(); hideOv();
   const f = e.dataTransfer && e.dataTransfer.files[0];
   if (!f || !loggedIn()) return;
   if (needNew()) openAdd();
   setFile(f);
 });
-document.addEventListener('paste', e => {   // Ctrl+V diye screenshot / file
+document.addEventListener('paste', e => {
   const f = e.clipboardData && e.clipboardData.files[0];
   if (!f || !loggedIn()) return;
   if (needNew()) openAdd();
