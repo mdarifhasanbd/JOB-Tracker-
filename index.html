@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Job Tracker</title>
+<style>
+:root{--bg:#f3f6fb;--card:#fff;--pri:#1f4e79;--txt:#1d2733;--mut:#6b7785;--bd:#dbe3ee}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Nirmala UI","Noto Sans Bengali",system-ui,sans-serif;background:var(--bg);color:var(--txt)}
+header{background:var(--pri);color:#fff;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:5}
+header h1{font-size:18px;margin:0}
+button{font:inherit;cursor:pointer;border:0;border-radius:8px;padding:9px 14px;background:var(--pri);color:#fff}
+button.sec{background:#e6edf6;color:var(--pri)} button.red{background:#c0392b}
+input,select,textarea{font:inherit;width:100%;padding:9px;border:1px solid var(--bd);border-radius:8px;background:#fff}
+textarea{min-height:90px}
+.wrap{max-width:900px;margin:0 auto;padding:14px}
+#login{min-height:100vh;display:flex;align-items:center;justify-content:center}
+#login .box{background:var(--card);padding:28px;border-radius:14px;width:300px;text-align:center;box-shadow:0 4px 20px #0001}
+.bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.bar input{flex:2;min-width:150px}.bar select{flex:1;min-width:130px}
+.stats{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.stat{background:var(--card);border-radius:10px;padding:8px 12px;font-size:13px;border:1px solid var(--bd)}
+.stat b{display:block;font-size:18px;color:var(--pri)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:10px}
+.card h3{margin:0 0 2px;font-size:16px}.card .org{color:var(--mut);margin-bottom:8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px 12px;font-size:13.5px}
+.grid span{color:var(--mut);display:block;font-size:12px}
+.row2{display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap}
+.row2 select{width:auto;flex:1}
+.warn{color:#c0392b;font-weight:700}
+dialog{border:0;border-radius:14px;padding:18px;width:min(560px,94vw);max-height:92vh}
+dialog::backdrop{background:#0006}
+.f{display:grid;grid-template-columns:1fr 1fr;gap:8px}.f label{font-size:12px;color:var(--mut)}
+.f .full{grid-column:1/-1}
+#msg{color:#c0392b;font-size:13px;min-height:18px}
+.empty{text-align:center;color:var(--mut);padding:40px}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <div class="box">
+    <div style="font-size:40px">🔒</div>
+    <h2 style="margin:6px 0 14px">Job Tracker</h2>
+    <input id="pw" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
+    <div id="msg"></div>
+    <button onclick="doLogin()" style="width:100%">Enter</button>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+  <header><h1>📋 চাকরি ট্র্যাকার</h1>
+    <div><button class="sec" onclick="openAdd()">+ নতুন</button> <button class="sec" onclick="logout()">Logout</button></div>
+  </header>
+  <div class="wrap">
+    <div class="stats" id="stats"></div>
+    <div class="bar">
+      <input id="q" placeholder="প্রতিষ্ঠান / পদ দিয়ে খুঁজুন" oninput="render()">
+      <select id="fs" onchange="render()"></select>
+    </div>
+    <div id="list"></div>
+  </div>
+</div>
+
+<dialog id="dlg">
+  <h3 style="margin-top:0">নতুন আবেদন</h3>
+  <label style="font-size:12px;color:#6b7785">সার্কুলারের তথ্য পেস্ট করুন (Claude-এর দেওয়া "কলাম: মান" লাইনগুলো)</label>
+  <textarea id="paste" placeholder="প্রতিষ্ঠান: ...&#10;পদ: ...&#10;গ্রেড: ..."></textarea>
+  <button class="sec" style="margin:6px 0 12px" onclick="parsePaste()">⬇ ঘরে বসাও</button>
+  <div class="f" id="form"></div>
+  <div class="row2" style="justify-content:flex-end">
+    <button class="sec" onclick="dlg.close()">বাতিল</button>
+    <button onclick="save()">সেভ</button>
+  </div>
+</dialog>
+
+<script>
+// ====== Apps Script Web app URL ekhane boshan ======
+const API = 'PASTE_YOUR_WEB_APP_URL_HERE';
+// ===================================================
+const FIELDS = ['প্রতিষ্ঠান','পদ','গ্রেড','বেতন','শূন্যপদ','কোথা থেকে আবেদন','আবেদনের তারিখ','শেষ তারিখ','ফি','User ID','পরীক্ষার তারিখ','লিংক','নোট'];
+const DATES = ['আবেদনের তারিখ','শেষ তারিখ','পরীক্ষার তারিখ'];
+let rows = [], statuses = [], pw = sessionStorage.getItem('jt_pw') || '';
+const $ = id => document.getElementById(id);
+
+async function call(body) {
+  const r = await fetch(API, {method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({password: pw, ...body})});
+  return r.json();
+}
+async function doLogin() {
+  pw = $('pw').value; $('msg').textContent = 'যাচাই হচ্ছে...';
+  try { const d = await call({action:'list'});
+    if (!d.ok) { $('msg').textContent = 'ভুল পাসওয়ার্ড'; return; }
+    sessionStorage.setItem('jt_pw', pw); start(d);
+  } catch (e) { $('msg').textContent = 'সংযোগ হয়নি'; }
+}
+function start(d) {
+  rows = d.rows; statuses = d.statuses;
+  $('login').style.display = 'none'; $('app').style.display = 'block';
+  $('fs').innerHTML = '<option value="">সব স্ট্যাটাস</option>' + statuses.map(s => `<option>${s}</option>`).join('');
+  buildForm(); render();
+}
+function logout() { sessionStorage.removeItem('jt_pw'); location.reload(); }
+async function reload() { const d = await call({action:'list'}); if (d.ok) { rows = d.rows; render(); } }
+
+function days(s) { if (!s) return null; const d = new Date(s); if (isNaN(d)) return null;
+  const t = new Date(); t.setHours(0,0,0,0); return Math.round((d - t) / 864e5); }
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function render() {
+  const q = $('q').value.trim().toLowerCase(), fs = $('fs').value;
+  const list = rows.filter(r => (!fs || r['স্ট্যাটাস'] === fs) &&
+    (!q || (r['প্রতিষ্ঠান'] + ' ' + r['পদ']).toLowerCase().includes(q))).reverse();
+  const cnt = s => rows.filter(r => r['স্ট্যাটাস'] === s).length;
+  $('stats').innerHTML = `<div class="stat">মোট<b>${rows.length}</b></div>` +
+    ['লিখিত পরীক্ষা','ভাইভা','নির্বাচিত'].map(s => `<div class="stat">${s}<b>${cnt(s)}</b></div>`).join('');
+  $('list').innerHTML = list.length ? list.map(card).join('') : '<div class="empty">কিছু পাওয়া যায়নি</div>';
+}
+function card(r) {
+  const dl = days(r['শেষ তারিখ']), ex = days(r['পরীক্ষার তারিখ']);
+  const warn = x => x !== null && x >= 0 && x <= 3 ? ' warn' : '';
+  const g = (k, extra='') => r[k] ? `<div><span>${k}</span><b class="${extra}">${esc(r[k])}</b></div>` : '';
+  return `<div class="card">
+    <h3>${esc(r['পদ'])}</h3><div class="org">${esc(r['প্রতিষ্ঠান'])}</div>
+    <div class="grid">${g('গ্রেড')}${g('বেতন')}${g('শূন্যপদ')}${g('কোথা থেকে আবেদন')}${g('আবেদনের তারিখ')}
+      ${g('শেষ তারিখ', warn(dl))}${g('ফি')}${g('User ID')}${g('পরীক্ষার তারিখ', warn(ex))}</div>
+    ${r['লিংক'] ? `<div style="margin-top:6px;font-size:13px"><a href="${esc(r['লিংক'])}" target="_blank" rel="noopener">🔗 লিংক</a></div>` : ''}
+    ${r['নোট'] ? `<div style="margin-top:6px;font-size:13px;color:#6b7785">📝 ${esc(r['নোট'])}</div>` : ''}
+    <div class="row2">
+      <select onchange="upd('${r.id}','স্ট্যাটাস',this.value)">${statuses.map(s => `<option${s===r['স্ট্যাটাস']?' selected':''}>${s}</option>`).join('')}</select>
+      <input type="date" value="${esc(r['পরীক্ষার তারিখ'])}" title="পরীক্ষার তারিখ" style="width:auto" onchange="upd('${r.id}','পরীক্ষার তারিখ',this.value)">
+      <button class="red" onclick="del('${r.id}')">মুছুন</button>
+    </div></div>`;
+}
+async function upd(id, k, v) {
+  const r = rows.find(x => x.id === id); if (r) r[k] = v;
+  await call({action:'update', id, fields:{[k]:v}}); render();
+}
+async function del(id) {
+  if (!confirm('মুছে ফেলবেন?')) return;
+  await call({action:'delete', id}); rows = rows.filter(x => x.id !== id); render();
+}
+
+function buildForm() {
+  $('form').innerHTML = FIELDS.map(k => {
+    const full = ['প্রতিষ্ঠান','পদ','লিংক','নোট'].includes(k) ? ' full' : '';
+    const t = DATES.includes(k) ? 'date' : 'text';
+    return `<div class="${full}"><label>${k}</label><input data-k="${k}" type="${t}"></div>`;
+  }).join('');
+}
+function openAdd() {
+  document.querySelectorAll('#form input').forEach(i => i.value = '');
+  document.querySelector('[data-k="আবেদনের তারিখ"]').value = new Date().toISOString().slice(0, 10);
+  $('paste').value = ''; $('dlg').showModal();
+}
+function parsePaste() {
+  $('paste').value.split('\n').forEach(line => {
+    const m = line.match(/^\s*([^:：]+)[:：]\s*(.*)$/); if (!m) return;
+    const key = FIELDS.find(f => f === m[1].trim() || m[1].trim().startsWith(f));
+    if (key) document.querySelector(`[data-k="${key}"]`).value = m[2].trim();
+  });
+}
+async function save() {
+  const data = {};
+  document.querySelectorAll('#form input').forEach(i => data[i.dataset.k] = i.value.trim());
+  if (!data['প্রতিষ্ঠান'] && !data['পদ']) { alert('প্রতিষ্ঠান বা পদ লিখুন'); return; }
+  const d = await call({action:'add', data});
+  if (d.ok) { $('dlg').close(); reload(); } else alert('সেভ হয়নি: ' + d.error);
+}
+
+if (pw) call({action:'list'}).then(d => { if (d.ok) start(d); else sessionStorage.removeItem('jt_pw'); }).catch(() => {});
+const dlg = $('dlg');
+</script>
+</body>
+</html>
