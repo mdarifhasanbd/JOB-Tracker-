@@ -41,7 +41,8 @@
 </header>
 
 <main class="max-w-7xl mx-auto px-4 mt-5">
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5" id="stats"></div>
+  <!-- Dynamic Cards Section -->
+  <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 mb-5" id="stats"></div>
 
   <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm mb-5 flex flex-col md:flex-row gap-3 justify-between">
     <div class="relative w-full md:w-96">
@@ -172,21 +173,47 @@ function render() {
   $('loading').classList.add('hidden');
   const q = $('q').value.trim().toLowerCase(), fs = $('fs').value;
   const list = rows.filter(r => (!fs || r['স্ট্যাটাস'] === fs) && (!q || (r['প্রতিষ্ঠান'] + ' ' + r['পদ']).toLowerCase().includes(q))).reverse();
-  const c = a => rows.filter(r => a.includes(r['স্ট্যাটাস'])).length;
-  const card = (ic, col, t, n) => `<div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
-    <div class="p-3 ${col} rounded-lg text-lg"><i class="fa-solid ${ic}"></i></div>
-    <div><p class="text-xs text-slate-500">${t}</p><h3 class="text-xl font-bold">${n}</h3></div></div>`;
+  
+  // Helper to get matching item index/serial numbers
+  const getSerials = (statusArr) => {
+    return list
+      .map((r, idx) => statusArr.includes(r['স্ট্যাটাস']) ? `#${idx + 1}` : null)
+      .filter(x => x !== null);
+  };
+
+  const getCardHtml = (ic, col, title, statusList) => {
+    const sList = getSerials(statusList);
+    const count = sList.length;
+    const serialsText = count > 0 ? sList.join(', ') : '—';
+    return `<div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+      <div class="flex items-center gap-2 mb-1">
+        <div class="p-2 ${col} rounded-lg text-sm"><i class="fa-solid ${ic}"></i></div>
+        <div>
+          <p class="text-[11px] text-slate-500 leading-tight">${title}</p>
+          <h3 class="text-lg font-bold leading-tight">${count}</h3>
+        </div>
+      </div>
+      <div class="text-[10px] text-slate-400 font-medium truncate pt-1 border-t border-slate-100" title="${serialsText}">
+        ${serialsText}
+      </div>
+    </div>`;
+  };
+
+  // Render 6 separate statistics cards with serial numbers underneath
   $('stats').innerHTML =
-    card('fa-paper-plane','bg-blue-100 text-blue-600','মোট আবেদন', rows.length) +
-    card('fa-clock','bg-amber-100 text-amber-600','আবেদনকৃত', c(['আবেদন করেছি','অ্যাডমিট কার্ড এসেছে'])) +
-    card('fa-user-graduate','bg-purple-100 text-purple-600','প্রিলি/লিখিত/ভাইভা', c(['প্রিলি','লিখিত','ব্যবহারিক','ভাইভা'])) +
-    card('fa-circle-check','bg-emerald-100 text-emerald-600','নির্বাচিত', c(['নির্বাচিত']));
+    getCardHtml('fa-paper-plane', 'bg-blue-100 text-blue-600', 'মোট আবেদন', statuses) +
+    getCardHtml('fa-clock', 'bg-amber-100 text-amber-600', 'আবেদনকৃত', ['আবেদন করেছি','অ্যাডমিট কার্ড এসেছে']) +
+    getCardHtml('fa-book-open', 'bg-violet-100 text-violet-600', 'প্রিলি', ['প্রিলি']) +
+    getCardHtml('fa-pen-nib', 'bg-sky-100 text-sky-600', 'লিখিত', ['লিখিত','ব্যবহারিক']) +
+    getCardHtml('fa-comments', 'bg-orange-100 text-orange-600', 'ভাইভা', ['ভাইভা']) +
+    getCardHtml('fa-circle-check', 'bg-emerald-100 text-emerald-600', 'নির্বাচিত', ['নির্বাচিত']);
+
   $('empty').classList.toggle('hidden', list.length > 0);
   $('tbody').innerHTML = list.map((r, i) => {
     const dl = days(r['শেষ তারিখ']), ns = nextStage(r), st = r['স্ট্যাটাস'];
     const dlWarn = dl !== null && dl >= 0 && dl <= 3 && st === 'আবেদন করেছি' ? 'text-rose-600 font-bold' : 'text-slate-600';
     
-    // আবেদনের লিংক থাকলে পদের নামের সাথে হাইপারলিংক যুক্ত হবে
+    // Hyperlink for post name
     const postLink = (r['লিংক'] || r['কোথা থেকে আবেদন']);
     const postTitleHtml = postLink 
       ? `<a href="${esc(postLink)}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:text-indigo-800 hover:underline font-semibold flex items-center gap-1">
@@ -195,7 +222,7 @@ function render() {
       : `<span class="font-semibold text-slate-800">${esc(r['পদ'])}</span>`;
 
     return `<tr class="hover:bg-slate-50">
-      <td class="p-3 text-slate-500">${i + 1}</td>
+      <td class="p-3 text-slate-500 font-medium">${i + 1}</td>
       <td class="p-3 font-semibold">${esc(r['প্রতিষ্ঠান'])}</td>
       <td class="p-3">${postTitleHtml}<div class="text-xs text-slate-500">${esc(r['গ্রেড'] ? 'গ্রেড ' + r['গ্রেড'] : '')}</div></td>
       <td class="p-3 text-slate-600">${bd(r['আবেদনের তারিখ'])}</td>
@@ -326,7 +353,7 @@ function pickPost(sn) {
   set('প্রতিষ্ঠান', circular.org); set('পদ', p.name); set('গ্রেড', p.grade); set('বেতন', p.salary);
   set('শূন্যপদ', p.vacancies); set('ফি', p.fee); set('শেষ তারিখ', circular.deadline); 
   set('কোথা থেকে আবেদন', circular.applyUrl);
-  set('লিংক', circular.applyUrl); // 'লিংক' ফিল্ডেও স্বয়ংক্রিয়ভাবে আবেদনের ইউআরএল সেট করে দেওয়া হলো
+  set('লিংক', circular.applyUrl);
   $('rmsg').textContent = '✅ বসানো হয়েছে। একবার মিলিয়ে দেখুন, User ID দিয়ে সংরক্ষণ করুন';
 }
 
