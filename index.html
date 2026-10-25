@@ -65,7 +65,17 @@ dialog::backdrop{background:#0006}
 
 <dialog id="dlg">
   <h3 style="margin-top:0">নতুন আবেদন</h3>
-  <label style="font-size:12px;color:#6b7785">সার্কুলারের তথ্য পেস্ট করুন (Claude-এর দেওয়া "কলাম: মান" লাইনগুলো)</label>
+  <div style="background:#eef4fb;border-radius:10px;padding:10px;margin-bottom:12px">
+    <label style="font-size:12px;color:#6b7785">সার্কুলারের PDF / ছবি দিন, তারপর ক্রমিক নং লিখুন</label>
+    <input id="file" type="file" accept="application/pdf,image/*" style="margin:6px 0">
+    <div style="display:flex;gap:8px">
+      <input id="serial" placeholder="ক্রমিক নং (যেমন 3)" inputmode="numeric" style="flex:1">
+      <button onclick="readCircular()" id="rbtn">পড়ো ও বসাও</button>
+    </div>
+    <div id="rmsg" style="font-size:13px;margin-top:6px;color:#6b7785"></div>
+    <div id="plist" style="margin-top:6px"></div>
+  </div>
+  <label style="font-size:12px;color:#6b7785">অথবা হাতে পেস্ট করুন ("কলাম: মান" লাইন)</label>
   <textarea id="paste" placeholder="প্রতিষ্ঠান: ...&#10;পদ: ...&#10;গ্রেড: ..."></textarea>
   <button class="sec" style="margin:6px 0 12px" onclick="parsePaste()">⬇ ঘরে বসাও</button>
   <div class="f" id="form"></div>
@@ -153,6 +163,51 @@ function openAdd() {
   document.querySelectorAll('#form input').forEach(i => i.value = '');
   document.querySelector('[data-k="আবেদনের তারিখ"]').value = new Date().toISOString().slice(0, 10);
   $('paste').value = ''; $('dlg').showModal();
+}
+let circular = null, circularFile = '';
+function fileToB64(f) {
+  return new Promise((res, rej) => {
+    if (f.type.startsWith('image/')) {   // chhobi chhoto kore nei
+      const img = new Image(); img.onload = () => {
+        const s = Math.min(1, 1800 / Math.max(img.width, img.height));
+        const c = document.createElement('canvas'); c.width = img.width * s; c.height = img.height * s;
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        res({mime: 'image/jpeg', data: c.toDataURL('image/jpeg', 0.85).split(',')[1]});
+      }; img.onerror = rej; img.src = URL.createObjectURL(f);
+    } else {
+      const fr = new FileReader();
+      fr.onload = () => res({mime: f.type || 'application/pdf', data: fr.result.split(',')[1]});
+      fr.onerror = rej; fr.readAsDataURL(f);
+    }
+  });
+}
+async function readCircular() {
+  const f = $('file').files[0], sn = $('serial').value.trim().replace(/[০-৯]/g, d => '০১২৩৪৫৬৭৮৯'.indexOf(d));
+  const key = f ? f.name + f.size : '';
+  if (!circular || (f && key !== circularFile)) {
+    if (!f) { $('rmsg').textContent = 'আগে PDF বা ছবি বেছে নিন'; return; }
+    if (f.size > 8e6) { $('rmsg').textContent = 'ফাইল ৮MB-এর বেশি, ছোট করে দিন'; return; }
+    $('rbtn').disabled = true; $('rmsg').textContent = 'পড়া হচ্ছে... (১০-৩০ সেকেন্ড)';
+    try {
+      const p = await fileToB64(f);
+      const d = await call({action: 'extract', mime: p.mime, data: p.data});
+      if (!d.ok) { $('rmsg').textContent = 'হয়নি: ' + d.error; $('rbtn').disabled = false; return; }
+      circular = d.circular; circularFile = key;
+    } catch (e) { $('rmsg').textContent = 'সংযোগ বা ফাইলে সমস্যা'; $('rbtn').disabled = false; return; }
+    $('rbtn').disabled = false;
+  }
+  const posts = circular.posts || [];
+  $('plist').innerHTML = posts.map(p => `<button class="sec" style="margin:2px" onclick="pickPost('${esc(p.serial)}')">${esc(p.serial)}. ${esc(p.name)}</button>`).join('');
+  if (sn) pickPost(sn); else $('rmsg').textContent = posts.length + 'টি পদ পাওয়া গেছে, নিচ থেকে বেছে নিন বা ক্রমিক নং লিখুন';
+}
+function pickPost(sn) {
+  const p = (circular.posts || []).find(x => String(x.serial).trim() === String(sn).trim());
+  if (!p) { $('rmsg').textContent = 'ক্রমিক ' + sn + ' পাওয়া যায়নি, নিচের বোতাম থেকে বেছে নিন'; return; }
+  const set = (k, v) => { if (v) document.querySelector(`[data-k="${k}"]`).value = v; };
+  set('প্রতিষ্ঠান', circular.org); set('পদ', p.name); set('গ্রেড', p.grade); set('বেতন', p.salary);
+  set('শূন্যপদ', p.vacancies); set('ফি', p.fee); set('শেষ তারিখ', circular.deadline);
+  set('কোথা থেকে আবেদন', circular.applyUrl);
+  $('rmsg').textContent = '✅ বসানো হয়েছে, একবার মিলিয়ে দেখে User ID দিয়ে সেভ করুন';
 }
 function parsePaste() {
   $('paste').value.split('\n').forEach(line => {
