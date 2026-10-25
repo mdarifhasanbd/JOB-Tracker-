@@ -29,7 +29,7 @@
   <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
     <div class="flex items-center gap-3">
       <div class="p-2 bg-indigo-600 rounded-lg"><i class="fa-solid fa-briefcase text-xl"></i></div>
-      <div><h1 class="text-lg sm:text-xl font-bold">চাকরি আবেদন ট্র্যাকার</h1>
+      <div><h1 class="text-lg sm:text-xl font-bold">চাকরি আবেদন ট্র্যাকার <span class="text-xs text-indigo-200 font-normal">v3</span></h1>
         <p class="text-xs text-indigo-200 hidden sm:block">প্রিলি · লিখিত · ভাইভা সব এক জায়গায়</p></div>
     </div>
     <div class="flex gap-2">
@@ -103,6 +103,11 @@
   </div>
 </div>
 
+<!-- drag overlay -->
+<div id="ov" class="fixed inset-0 z-[70] hidden items-center justify-center bg-indigo-900/70 text-white text-2xl font-bold pointer-events-none">
+  <div class="border-4 border-dashed border-white rounded-3xl px-10 py-12 text-center"><i class="fa-solid fa-cloud-arrow-up text-5xl block mb-3"></i>সার্কুলারটি এখানে ছেড়ে দিন</div>
+</div>
+
 <!-- Details modal -->
 <div id="dModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center z-50 p-3">
   <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[92vh] flex flex-col overflow-hidden">
@@ -130,7 +135,7 @@ const BADGE = {
   'ভাইভা':'bg-orange-100 text-orange-800','নির্বাচিত':'bg-emerald-100 text-emerald-800','বাদ':'bg-rose-100 text-rose-800'
 };
 let rows = [], statuses = [], pw = sessionStorage.getItem('jt_pw') || '', editId = '';
-let circular = null, circularKey = '';
+let circular = null, circularKey = '', pickedFile = null;
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -238,7 +243,7 @@ function openAdd() {
   editId = ''; $('mTitle').textContent = 'নতুন আবেদন'; $('aiBox').classList.remove('hidden');
   document.querySelectorAll('#form [data-k]').forEach(i => i.value = '');
   fld('স্ট্যাটাস').value = statuses[0]; fld('আবেদনের তারিখ').value = new Date().toISOString().slice(0, 10);
-  $('serial').value = ''; $('rmsg').textContent = ''; $('file').value = ''; showPicked(); showModal();
+  $('serial').value = ''; $('rmsg').textContent = ''; $('file').value = ''; pickedFile = null; showPicked(); showModal();
 }
 function openEdit(id) {
   const r = rows.find(x => x.id === id); if (!r) return;
@@ -276,7 +281,8 @@ function fileToB64(f) {
   });
 }
 async function readCircular() {
-  const f = $('file').files[0];
+  if ($('rbtn').disabled) return;   // pora cholche
+  const f = pickedFile;
   const sn = $('serial').value.trim().replace(/[০-৯]/g, d => '০১২৩৪৫৬৭৮৯'.indexOf(d));
   const key = f ? f.name + f.size : '';
   if (!circular || (f && key !== circularKey)) {
@@ -301,7 +307,8 @@ async function readCircular() {
   }
   const posts = circular.posts || [];
   $('plist').innerHTML = posts.map(p => `<button type="button" onclick="pickPost('${esc(p.serial)}')" class="px-2 py-1 bg-white border border-indigo-200 hover:bg-indigo-100 rounded-lg text-xs">${esc(p.serial)}. ${esc(p.name)}</button>`).join('');
-  if (sn) pickPost(sn); else $('rmsg').textContent = posts.length + 'টি পদ পাওয়া গেছে, নিচ থেকে বেছে নিন বা ক্রমিক নং লিখুন';
+  const sn2 = $('serial').value.trim().replace(/[০-৯]/g, d => '০১২৩৪৫৬৭৮৯'.indexOf(d));
+  if (sn2) pickPost(sn2); else $('rmsg').textContent = posts.length + 'টি পদ পাওয়া গেছে, নিচ থেকে বেছে নিন বা ক্রমিক নং লিখুন';
 }
 function pickPost(sn) {
   const p = (circular.posts || []).find(x => String(x.serial).trim() === String(sn).trim());
@@ -314,24 +321,46 @@ function pickPost(sn) {
 
 // ===== drag & drop =====
 function showPicked() {
-  const f = $('file').files[0];
+  const f = pickedFile;
   $('dropTxt').innerHTML = f ? '📄 <b>' + esc(f.name) + '</b> (' + (f.size / 1024 / 1024).toFixed(1) + ' MB)' : 'PDF / ছবি এখানে <b>টেনে এনে ছাড়ুন</b> অথবা চাপ দিয়ে বেছে নিন';
 }
-$('file').addEventListener('change', showPicked);
+function setFile(f) {   // file dhorei sathe sathe pora shuru
+  if (!f) return;
+  if (!/pdf|image/.test(f.type)) { $('rmsg').textContent = 'শুধু PDF বা ছবি দিন'; return; }
+  pickedFile = f; showPicked(); readCircular();
+}
+$('file').addEventListener('change', e => setFile(e.target.files[0]));
 ['dragenter', 'dragover'].forEach(ev => $('drop').addEventListener(ev, e => {
   e.preventDefault(); $('drop').classList.add('bg-indigo-100', 'border-indigo-600');
 }));
 ['dragleave', 'drop'].forEach(ev => $('drop').addEventListener(ev, e => {
   e.preventDefault(); $('drop').classList.remove('bg-indigo-100', 'border-indigo-600');
 }));
-$('drop').addEventListener('drop', e => {
-  const f = e.dataTransfer.files[0];
-  if (!f) return;
-  if (!/pdf|image/.test(f.type)) { $('rmsg').textContent = 'শুধু PDF বা ছবি দিন'; return; }
-  const dt = new DataTransfer(); dt.items.add(f); $('file').files = dt.files; showPicked();
-});
+// drop korle niche er window handler ta file dhore
 // zone er baire chhere dile browser jeno file khule na felе
-['dragover', 'drop'].forEach(ev => window.addEventListener(ev, e => e.preventDefault()));
+const hideOv = () => { $('ov').classList.add('hidden'); $('ov').classList.remove('flex'); };
+const loggedIn = () => !$('app').classList.contains('hidden');
+const needNew = () => $('jobModal').classList.contains('hidden') || editId;
+window.addEventListener('dragenter', e => {
+  e.preventDefault();
+  if (loggedIn() && e.dataTransfer && [...e.dataTransfer.types].includes('Files')) { $('ov').classList.remove('hidden'); $('ov').classList.add('flex'); }
+});
+window.addEventListener('dragleave', e => { if (!e.relatedTarget) hideOv(); });
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => {      // jekhanei chhaden, file nebe
+  e.preventDefault(); hideOv();
+  const f = e.dataTransfer && e.dataTransfer.files[0];
+  if (!f || !loggedIn()) return;
+  if (needNew()) openAdd();
+  setFile(f);
+});
+document.addEventListener('paste', e => {   // Ctrl+V diye screenshot / file
+  const f = e.clipboardData && e.clipboardData.files[0];
+  if (!f || !loggedIn()) return;
+  if (needNew()) openAdd();
+  setFile(f);
+});
+$('serial').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); readCircular(); } });
 
 if (pw) call({action:'list'}).then(d => { if (d.ok) start(d); else sessionStorage.removeItem('jt_pw'); }).catch(() => {});
 </script>
