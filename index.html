@@ -37,6 +37,7 @@
     <div class="flex gap-2">
       <button onclick="openAdd()" class="bg-emerald-500 hover:bg-emerald-600 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
         <i class="fa-solid fa-plus"></i><span>নতুন আবেদন</span></button>
+      <button onclick="openTrash()" class="bg-indigo-600 hover:bg-indigo-500 px-3 py-2 rounded-lg text-sm" title="Trash (মুছে ফেলা আবেদন ফেরত আনুন)"><i class="fa-solid fa-trash-can-arrow-up"></i></button>
       <button onclick="logout()" class="bg-indigo-600 hover:bg-indigo-500 px-3 py-2 rounded-lg text-sm" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></button>
     </div>
   </div>
@@ -134,6 +135,20 @@
   </div>
 </div>
 
+<!-- Trash -->
+<div id="trModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center z-50 p-3">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden">
+    <div class="bg-slate-800 px-5 py-3 text-white flex justify-between items-center">
+      <h3 class="text-lg font-bold"><i class="fa-solid fa-trash-can-arrow-up mr-2"></i>Trash</h3>
+      <button onclick="closeTrash()" class="text-slate-300 hover:text-white text-xl"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="p-4 overflow-y-auto">
+      <div id="trMsg" class="text-sm text-slate-500 mb-2"></div>
+      <div id="trList" class="space-y-2"></div>
+    </div>
+  </div>
+</div>
+
 <!-- Delete confirm (পাসওয়ার্ড লাগবে) -->
 <div id="delModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center z-[80] p-3">
   <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
@@ -195,7 +210,7 @@ async function call(body) {
 function showLogin(m) {
   $('app').classList.add('hidden'); $('login').classList.remove('hidden');
   $('pw').value = ''; $('msg').textContent = m || '';
-  closeModal(); closeD(); closeDel();
+  closeModal(); closeD(); closeDel(); closeTrash();
 }
 function forceLogout(m) { sessionStorage.removeItem('jt_tok'); token = ''; rows = []; showLogin(m); }
 async function doLogin() {
@@ -553,412 +568,32 @@ document.addEventListener('paste', e => {
 });
 $('serial').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); readCircular(); } });
 
+// ===== Trash: মুছে ফেলা আবেদন এক ক্লিকে ফেরত =====
+function closeTrash() { $('trModal').classList.add('hidden'); $('trModal').classList.remove('flex'); }
+async function openTrash() {
+  $('trModal').classList.remove('hidden'); $('trModal').classList.add('flex');
+  $('trList').innerHTML = ''; $('trMsg').textContent = 'লোড হচ্ছে...';
+  const d = await call({action:'trashList'});
+  if (!d.ok) { $('trMsg').textContent = 'হয়নি: ' + (ERR[d.error] || d.error); return; }
+  const list = d.rows.slice().reverse();
+  $('trMsg').textContent = list.length ? list.length + 'টি মুছে ফেলা আবেদন (নতুন আগে)' : 'Trash খালি';
+  $('trList').innerHTML = list.map(r => `<div class="flex items-center justify-between gap-2 border border-slate-200 rounded-lg p-3">
+    <div class="min-w-0"><div class="font-semibold text-sm truncate">${esc(r['প্রতিষ্ঠান'])}</div>
+      <div class="text-xs text-slate-600 truncate">${esc(r['পদ'])}</div>
+      <div class="text-[10px] text-slate-400">মোছা হয়েছে: ${esc(r['মোছার সময়'])}</div></div>
+    <button data-restore="${esc(r.id)}" class="shrink-0 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-medium"><i class="fa-solid fa-rotate-left mr-1"></i>ফেরত আনুন</button>
+  </div>`).join('');
+}
+$('trList').addEventListener('click', async e => {
+  const b = e.target.closest('[data-restore]'); if (!b) return;
+  b.disabled = true; b.textContent = '...';
+  const d = await call({action:'restore', id: b.dataset.restore});
+  if (d.ok) { await reload(); openTrash(); }
+  else { b.disabled = false; b.textContent = 'ফেরত আনুন'; alert('ফেরত আসেনি: ' + (ERR[d.error] || d.error)); }
+});
+
 // পেজ খুললে আগের সেশন থাকলে সরাসরি ঢোকে
 if (token) call({action:'list'}).then(d => { if (d.ok) start(d); else forceLogout(''); }).catch(() => {});
-</script>
-</body>
-</html><!DOCTYPE html>
-<html lang="bn">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Job Tracker</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<script>tailwind.config={theme:{extend:{fontFamily:{sans:['Hind Siliguri','Nirmala UI','sans-serif']}}}}</script>
-<style>body{font-family:'Hind Siliguri','Nirmala UI',sans-serif}</style>
-</head>
-<body class="bg-slate-50 text-slate-800 min-h-screen pb-12">
-
-<!-- Login -->
-<div id="login" class="min-h-screen flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl shadow-lg p-8 w-full max-w-xs text-center">
-    <div class="text-5xl mb-2">🔒</div>
-    <h2 class="text-lg font-bold mb-4">Job Tracker</h2>
-    <input id="pw" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()"
-      class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none mb-2">
-    <div id="msg" class="text-rose-600 text-sm min-h-[20px]"></div>
-    <button onclick="doLogin()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg py-2 font-medium">Enter</button>
-  </div>
-</div>
-
-<div id="app" class="hidden">
-<header class="bg-indigo-700 text-white shadow-md sticky top-0 z-30">
-  <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
-    <div class="flex items-center gap-3">
-      <div class="p-2 bg-indigo-600 rounded-lg"><i class="fa-solid fa-briefcase text-xl"></i></div>
-      <div><h1 class="text-lg sm:text-xl font-bold">চাকরি আবেদন ট্র্যাকার <span class="text-xs text-indigo-200 font-normal">v3</span></h1>
-        <p class="text-xs text-indigo-200 hidden sm:block">প্রিলি · লিখিত · ভাইভা সব এক জায়গায়</p></div>
-    </div>
-    <div class="flex gap-2">
-      <button onclick="openAdd()" class="bg-emerald-500 hover:bg-emerald-600 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
-        <i class="fa-solid fa-plus"></i><span>নতুন আবেদন</span></button>
-      <button onclick="logout()" class="bg-indigo-600 hover:bg-indigo-500 px-3 py-2 rounded-lg text-sm" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></button>
-    </div>
-  </div>
-</header>
-
-<main class="max-w-7xl mx-auto px-4 mt-5">
-  <!-- Dynamic Cards Section -->
-  <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 mb-5" id="stats"></div>
-
-  <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm mb-5 flex flex-col md:flex-row gap-3 justify-between">
-    <div class="relative w-full md:w-96">
-      <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-      <input id="q" oninput="render()" placeholder="প্রতিষ্ঠান বা পদ দিয়ে খুঁজুন..."
-        class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-    </div>
-    <div class="flex gap-2">
-      <select id="fs" onchange="render()" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"></select>
-      <button onclick="reload()" class="px-3 py-2 border border-slate-300 hover:bg-slate-100 rounded-lg text-sm"><i class="fa-solid fa-rotate"></i></button>
-    </div>
-  </div>
-
-  <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-sm">
-        <thead><tr class="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
-          <th class="p-3">#</th><th class="p-3">প্রতিষ্ঠান</th><th class="p-3">পদ</th>
-          <th class="p-3">আবেদন</th><th class="p-3">শেষ তারিখ</th><th class="p-3">পরবর্তী ধাপ</th>
-          <th class="p-3">স্ট্যাটাস</th><th class="p-3 text-center">অ্যাকশন</th>
-        </tr></thead>
-        <tbody id="tbody" class="divide-y divide-slate-200"></tbody>
-      </table>
-    </div>
-    <div id="empty" class="hidden p-8 text-center text-slate-500"><i class="fa-regular fa-folder-open text-4xl mb-2 text-slate-300"></i><p>কোনো তথ্য পাওয়া যায়নি!</p></div>
-    <div id="loading" class="p-8 text-center text-slate-500">লোড হচ্ছে...</div>
-  </div>
-</main>
-</div>
-
-<!-- Add / Edit modal -->
-<div id="jobModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center z-50 p-3">
-  <div class="bg-white rounded-2xl shadow-xl w-full max-w-xl max-h-[94vh] flex flex-col overflow-hidden">
-    <div class="bg-indigo-700 px-5 py-3 text-white flex justify-between items-center">
-      <h3 id="mTitle" class="text-lg font-bold">নতুন আবেদন</h3>
-      <button onclick="closeModal()" class="text-indigo-200 hover:text-white text-xl"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    <div class="p-5 overflow-y-auto space-y-4">
-      <div id="aiBox" class="bg-indigo-50 border border-indigo-100 rounded-xl p-3">
-        <label class="block text-xs font-semibold text-slate-600 mb-1">সার্কুলারের PDF / ছবি দিন, তারপর ক্রমিক নং লিখুন</label>
-        <label id="drop" class="block cursor-pointer border-2 border-dashed border-indigo-300 hover:border-indigo-500 bg-white rounded-xl p-4 text-center text-sm text-slate-600 mb-2 transition">
-          <i class="fa-solid fa-cloud-arrow-up text-2xl text-indigo-400 block mb-1"></i>
-          <span id="dropTxt">PDF / ছবি এখানে <b>টেনে এনে ছাড়ুন</b> অথবা চাপ দিয়ে বেছে নিন</span>
-          <input id="file" type="file" accept="application/pdf,image/*" class="hidden">
-        </label>
-        <div class="flex gap-2">
-          <input id="serial" inputmode="numeric" placeholder="ক্রমিক নং (যেমন 3)" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm">
-          <button id="rbtn" onclick="readCircular()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">পড়ো ও বসাও</button>
-        </div>
-        <div id="rmsg" class="text-xs text-slate-500 mt-2"></div>
-        <div id="plist" class="mt-1 flex flex-wrap gap-1"></div>
-      </div>
-      <form id="form" class="grid grid-cols-1 sm:grid-cols-2 gap-3" onsubmit="save(event)"></form>
-    </div>
-    <div class="px-5 py-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
-      <button onclick="closeModal()" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-100 text-sm">বাতিল</button>
-      <button id="sbtn" onclick="save()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">সংরক্ষণ করুন</button>
-    </div>
-  </div>
-</div>
-
-<!-- drag overlay -->
-<div id="ov" class="fixed inset-0 z-[70] hidden items-center justify-center bg-indigo-900/70 text-white text-2xl font-bold pointer-events-none">
-  <div class="border-4 border-dashed border-white rounded-3xl px-10 py-12 text-center"><i class="fa-solid fa-cloud-arrow-up text-5xl block mb-3"></i>সার্কুলারটি এখানে ছেড়ে দিন</div>
-</div>
-
-<!-- Details modal -->
-<div id="dModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center z-50 p-3">
-  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[92vh] flex flex-col overflow-hidden">
-    <div class="bg-slate-800 px-5 py-3 text-white flex justify-between items-center">
-      <h3 class="text-lg font-bold">আবেদনের বিবরণ</h3>
-      <button onclick="closeD()" class="text-slate-300 hover:text-white text-xl"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    <div class="p-5 space-y-3 overflow-y-auto" id="dBody"></div>
-  </div>
-</div>
-
-<script>
-// ====== Apps Script Web app URL ======
-const API = 'https://script.google.com/macros/s/AKfycbxULpKXBeC4jiD6q-ZxxAwoQHyLEm37_W-8iFS8osZcFVnYISZlhma_hNUyr5xF1bqu/exec';
-// =====================================
-const FIELDS = [
-  ['প্রতিষ্ঠান','text',1],['পদ','text',1],['গ্রেড','text'],['বেতন','text'],['শূন্যপদ','text'],['ফি','text'],
-  ['কোথা থেকে আবেদন','text',1],['আবেদনের তারিখ','date'],['শেষ তারিখ','date'],['User ID','text'],['স্ট্যাটাস','select'],
-  ['প্রিলি তারিখ','date'],['লিখিত তারিখ','date'],['ভাইভা তারিখ','date'],['লিংক','text',1],['নোট','textarea',1]
-];
-const STAGES = [['প্রিলি','প্রিলি তারিখ'],['লিখিত','লিখিত তারিখ'],['ভাইভা','ভাইভা তারিখ']];
-const BADGE = {
-  'আবেদন করেছি':'bg-amber-100 text-amber-800','অ্যাডমিট কার্ড এসেছে':'bg-sky-100 text-sky-800',
-  'প্রিলি':'bg-violet-100 text-violet-800','লিখিত':'bg-blue-100 text-blue-800','ব্যবহারিক':'bg-teal-100 text-teal-800',
-  'ভাইভা':'bg-orange-100 text-orange-800','নির্বাচিত':'bg-emerald-100 text-emerald-800','বাদ':'bg-rose-100 text-rose-800'
-};
-let rows = [], statuses = [], pw = sessionStorage.getItem('jt_pw') || '', editId = '';
-let circular = null, circularKey = '', pickedFile = null;
-const $ = id => document.getElementById(id);
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-
-async function call(body) {
-  const r = await fetch(API, {method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({password: pw, ...body})});
-  return r.json();
-}
-async function doLogin() {
-  pw = $('pw').value; $('msg').textContent = 'যাচাই হচ্ছে...';
-  try { const d = await call({action:'list'});
-    if (!d.ok) { $('msg').textContent = 'ভুল পাসওয়ার্ড'; return; }
-    sessionStorage.setItem('jt_pw', pw); start(d);
-  } catch (e) { $('msg').textContent = 'সংযোগ হয়নি'; }
-}
-function start(d) {
-  rows = d.rows; statuses = d.statuses;
-  $('login').classList.add('hidden'); $('app').classList.remove('hidden');
-  $('fs').innerHTML = '<option value="">সব স্ট্যাটাস</option>' + statuses.map(s => `<option>${s}</option>`).join('');
-  buildForm(); render();
-}
-function logout() { sessionStorage.removeItem('jt_pw'); location.reload(); }
-async function reload() { $('loading').classList.remove('hidden'); const d = await call({action:'list'}); if (d.ok) { rows = d.rows; render(); } }
-
-function days(s) { if (!s) return null; const d = new Date(s); if (isNaN(d)) return null;
-  const t = new Date(); t.setHours(0,0,0,0); return Math.round((d - t) / 864e5); }
-function bd(s) { if (!s) return '—'; const d = new Date(s); return isNaN(d) ? esc(s) : d.toLocaleDateString('bn-BD', {day:'2-digit', month:'2-digit', year:'numeric'}); }
-function left(x) { return x === null ? '' : x < 0 ? '' : x === 0 ? 'আজ' : x + ' দিন বাকি'; }
-function nextStage(r) {
-  const l = STAGES.map(([n, k]) => ({n, s: r[k], d: days(r[k])})).filter(x => x.d !== null && x.d >= 0);
-  l.sort((a, b) => a.d - b.d); return l[0];
-}
-
-function render() {
-  $('loading').classList.add('hidden');
-  const q = $('q').value.trim().toLowerCase(), fs = $('fs').value;
-  const list = rows.filter(r => (!fs || r['স্ট্যাটাস'] === fs) && (!q || (r['প্রতিষ্ঠান'] + ' ' + r['পদ']).toLowerCase().includes(q))).reverse();
-  
-  // Helper to get matching item index/serial numbers
-  const getSerials = (statusArr) => {
-    return list
-      .map((r, idx) => statusArr.includes(r['স্ট্যাটাস']) ? `#${idx + 1}` : null)
-      .filter(x => x !== null);
-  };
-
-  const getCardHtml = (ic, col, title, statusList) => {
-    const sList = getSerials(statusList);
-    const count = sList.length;
-    const serialsText = count > 0 ? sList.join(', ') : '—';
-    return `<div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-      <div class="flex items-center gap-2 mb-1">
-        <div class="p-2 ${col} rounded-lg text-sm"><i class="fa-solid ${ic}"></i></div>
-        <div>
-          <p class="text-[11px] text-slate-500 leading-tight">${title}</p>
-          <h3 class="text-lg font-bold leading-tight">${count}</h3>
-        </div>
-      </div>
-      <div class="text-[10px] text-slate-400 font-medium truncate pt-1 border-t border-slate-100" title="${serialsText}">
-        ${serialsText}
-      </div>
-    </div>`;
-  };
-
-  // Render 6 separate statistics cards with serial numbers underneath
-  $('stats').innerHTML =
-    getCardHtml('fa-paper-plane', 'bg-blue-100 text-blue-600', 'মোট আবেদন', statuses) +
-    getCardHtml('fa-clock', 'bg-amber-100 text-amber-600', 'আবেদনকৃত', ['আবেদন করেছি','অ্যাডমিট কার্ড এসেছে']) +
-    getCardHtml('fa-book-open', 'bg-violet-100 text-violet-600', 'প্রিলি', ['প্রিলি']) +
-    getCardHtml('fa-pen-nib', 'bg-sky-100 text-sky-600', 'লিখিত', ['লিখিত','ব্যবহারিক']) +
-    getCardHtml('fa-comments', 'bg-orange-100 text-orange-600', 'ভাইভা', ['ভাইভা']) +
-    getCardHtml('fa-circle-check', 'bg-emerald-100 text-emerald-600', 'নির্বাচিত', ['নির্বাচিত']);
-
-  $('empty').classList.toggle('hidden', list.length > 0);
-  $('tbody').innerHTML = list.map((r, i) => {
-    const dl = days(r['শেষ তারিখ']), ns = nextStage(r), st = r['স্ট্যাটাস'];
-    const dlWarn = dl !== null && dl >= 0 && dl <= 3 && st === 'আবেদন করেছি' ? 'text-rose-600 font-bold' : 'text-slate-600';
-    
-    // Hyperlink for post name
-    const postLink = (r['লিংক'] || r['কোথা থেকে আবেদন']);
-    const postTitleHtml = postLink 
-      ? `<a href="${esc(postLink)}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:text-indigo-800 hover:underline font-semibold flex items-center gap-1">
-          ${esc(r['পদ'])} <i class="fa-solid fa-arrow-up-right-from-square text-[10px] opacity-70"></i>
-         </a>`
-      : `<span class="font-semibold text-slate-800">${esc(r['পদ'])}</span>`;
-
-    return `<tr class="hover:bg-slate-50">
-      <td class="p-3 text-slate-500 font-medium">${i + 1}</td>
-      <td class="p-3 font-semibold">${esc(r['প্রতিষ্ঠান'])}</td>
-      <td class="p-3">${postTitleHtml}<div class="text-xs text-slate-500">${esc(r['গ্রেড'] ? 'গ্রেড ' + r['গ্রেড'] : '')}</div></td>
-      <td class="p-3 text-slate-600">${bd(r['আবেদনের তারিখ'])}</td>
-      <td class="p-3 ${dlWarn}">${bd(r['শেষ তারিখ'])}</td>
-      <td class="p-3">${ns ? `<b class="${ns.d <= 3 ? 'text-rose-600' : ''}">${ns.n}</b> · ${bd(ns.s)}<div class="text-xs text-slate-500">${left(ns.d)}</div>` : '<span class="text-slate-400">—</span>'}</td>
-      <td class="p-3"><select onchange="setStatus('${r.id}',this.value)" class="text-xs font-semibold rounded-full px-2 py-1 border-0 ${BADGE[st] || 'bg-slate-100'}">
-        ${statuses.map(s => `<option${s === st ? ' selected' : ''}>${s}</option>`).join('')}</select></td>
-      <td class="p-3 text-center whitespace-nowrap">
-        <button onclick="view('${r.id}')" class="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-md" title="বিস্তারিত"><i class="fa-solid fa-eye"></i></button>
-        <button onclick="openEdit('${r.id}')" class="p-1.5 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-md" title="এডিট"><i class="fa-solid fa-pen-to-square"></i></button>
-        <button onclick="del('${r.id}')" class="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-md" title="ডিলিট"><i class="fa-solid fa-trash"></i></button>
-      </td></tr>`;
-  }).join('');
-}
-async function setStatus(id, v) {
-  const r = rows.find(x => x.id === id); if (r) r['স্ট্যাটাস'] = v; render();
-  await call({action:'update', id, fields:{'স্ট্যাটাস': v}});
-}
-async function del(id) {
-  if (!confirm('মুছে ফেলবেন?')) return;
-  rows = rows.filter(x => x.id !== id); render();
-  await call({action:'delete', id});
-}
-function view(id) {
-  const r = rows.find(x => x.id === id); if (!r) return;
-  const item = (t, v) => `<div><span class="text-xs text-slate-500 font-semibold block">${t}</span><p class="text-slate-800">${v || '—'}</p></div>`;
-  $('dBody').innerHTML =
-    `<div><span class="text-xs text-slate-500 font-semibold block">প্রতিষ্ঠান</span><p class="font-bold text-lg">${esc(r['প্রতিষ্ঠান'])}</p></div>` +
-    item('পদ', esc(r['পদ'])) +
-    `<div class="grid grid-cols-2 gap-3">${item('গ্রেড', esc(r['গ্রেড']))}${item('বেতন', esc(r['বেতন']))}${item('শূন্যপদ', esc(r['শূন্যপদ']))}${item('ফি', esc(r['ফি']))}</div>` +
-    item('কোথা থেকে আবেদন', esc(r['কোথা থেকে আবেদন'])) +
-    `<div class="grid grid-cols-2 gap-3">${item('আবেদনের তারিখ', bd(r['আবেদনের তারিখ']))}${item('শেষ তারিখ', bd(r['শেষ তারিখ']))}${item('User ID', esc(r['User ID']))}${item('স্ট্যাটাস', esc(r['স্ট্যাটাস']))}</div>` +
-    `<div class="grid grid-cols-3 gap-3">${STAGES.map(([n, k]) => item(n, bd(r[k]))).join('')}</div>` +
-    item('লিংক', r['লিংক'] ? `<a class="text-indigo-600 underline break-all" target="_blank" rel="noopener" href="${esc(r['লিংক'])}">${esc(r['লিংক'])}</a>` : '') +
-    item('নোট', `<span class="block bg-slate-100 p-2 rounded-lg text-sm whitespace-pre-wrap">${esc(r['নোট'])}</span>`);
-  $('dModal').classList.remove('hidden'); $('dModal').classList.add('flex');
-}
-function closeD() { $('dModal').classList.add('hidden'); $('dModal').classList.remove('flex'); }
-
-function buildForm() {
-  $('form').innerHTML = FIELDS.map(([k, t, full]) => {
-    const cls = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white';
-    let inp;
-    if (t === 'select') inp = `<select data-k="${k}" class="${cls}">${statuses.map(s => `<option>${s}</option>`).join('')}</select>`;
-    else if (t === 'textarea') inp = `<textarea data-k="${k}" rows="2" class="${cls}" placeholder="যা মনে রাখতে চান"></textarea>`;
-    else inp = `<input data-k="${k}" type="${t}" class="${cls}">`;
-    return `<div class="${full ? 'sm:col-span-2' : ''}"><label class="block text-xs font-semibold text-slate-600 mb-1">${k}</label>${inp}</div>`;
-  }).join('');
-}
-const fld = k => document.querySelector(`[data-k="${k}"]`);
-function showModal() { $('jobModal').classList.remove('hidden'); $('jobModal').classList.add('flex'); }
-function closeModal() { $('jobModal').classList.add('hidden'); $('jobModal').classList.remove('flex'); }
-function openAdd() {
-  editId = ''; $('mTitle').textContent = 'নতুন আবেদন'; $('aiBox').classList.remove('hidden');
-  document.querySelectorAll('#form [data-k]').forEach(i => i.value = '');
-  fld('স্ট্যাটাস').value = statuses[0]; fld('আবেদনের তারিখ').value = new Date().toISOString().slice(0, 10);
-  $('serial').value = ''; $('rmsg').textContent = ''; $('file').value = ''; pickedFile = null; showPicked(); showModal();
-}
-function openEdit(id) {
-  const r = rows.find(x => x.id === id); if (!r) return;
-  editId = id; $('mTitle').textContent = 'আবেদন সংশোধন'; $('aiBox').classList.add('hidden');
-  document.querySelectorAll('#form [data-k]').forEach(i => i.value = r[i.dataset.k] || '');
-  showModal();
-}
-async function save(e) {
-  if (e) e.preventDefault();
-  const data = {}; document.querySelectorAll('#form [data-k]').forEach(i => data[i.dataset.k] = i.value.trim());
-  if (!data['প্রতিষ্ঠান'] && !data['পদ']) { alert('প্রতিষ্ঠান বা পদ লিখুন'); return; }
-  $('sbtn').disabled = true; $('sbtn').textContent = 'সেভ হচ্ছে...';
-  try {
-    const d = editId ? await call({action:'update', id: editId, fields: data}) : await call({action:'add', data});
-    if (d.ok) { closeModal(); await reload(); } else alert('সেভ হয়নি: ' + d.error);
-  } catch (err) { alert('সংযোগ হয়নি'); }
-  $('sbtn').disabled = false; $('sbtn').textContent = 'সংরক্ষণ করুন';
-}
-
-// ===== PDF / chhobi theke auto =====
-function fileToB64(f) {
-  return new Promise((res, rej) => {
-    if (f.type.startsWith('image/')) {
-      const img = new Image(); img.onload = () => {
-        const s = Math.min(1, 1800 / Math.max(img.width, img.height));
-        const c = document.createElement('canvas'); c.width = img.width * s; c.height = img.height * s;
-        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-        res({mime:'image/jpeg', data: c.toDataURL('image/jpeg', 0.85).split(',')[1]});
-      }; img.onerror = rej; img.src = URL.createObjectURL(f);
-    } else {
-      const fr = new FileReader();
-      fr.onload = () => res({mime: f.type || 'application/pdf', data: fr.result.split(',')[1]});
-      fr.onerror = rej; fr.readAsDataURL(f);
-    }
-  });
-}
-async function readCircular() {
-  if ($('rbtn').disabled) return;
-  const f = pickedFile;
-  const sn = $('serial').value.trim().replace(/[০-৯]/g, d => '০১২৩৪৫৬৭৮৯'.indexOf(d));
-  const key = f ? f.name + f.size : '';
-  if (!circular || (f && key !== circularKey)) {
-    if (!f) { $('rmsg').textContent = 'আগে PDF বা ছবি বেছে নিন'; return; }
-    if (f.size > 8e6) { $('rmsg').textContent = 'ফাইল ৮MB-এর বেশি, ছোট করে দিন'; return; }
-    let saved = null;
-    try { saved = JSON.parse(localStorage.getItem('jt_c_' + key) || 'null'); } catch (e) {}
-    if (saved) { circular = saved; circularKey = key; }
-    else {
-      $('rbtn').disabled = true;
-      const t0 = Date.now(), tm = setInterval(() => $('rmsg').textContent = 'পড়া হচ্ছে... ' + Math.round((Date.now() - t0) / 1000) + ' সেকেন্ড (প্রথমবার শুধু, পরে ঝটপট)', 500);
-      try {
-        const p = await fileToB64(f);
-        const d = await call({action:'extract', mime: p.mime, data: p.data});
-        clearInterval(tm);
-        if (!d.ok) { $('rmsg').textContent = 'হয়নি: ' + d.error; $('rbtn').disabled = false; return; }
-        circular = d.circular; circularKey = key;
-        try { localStorage.setItem('jt_c_' + key, JSON.stringify(circular)); } catch (e) {}
-      } catch (e) { clearInterval(tm); $('rmsg').textContent = 'সংযোগ বা ফাইলে সমস্যা'; $('rbtn').disabled = false; return; }
-      $('rbtn').disabled = false;
-    }
-  }
-  const posts = circular.posts || [];
-  $('plist').innerHTML = posts.map(p => `<button type="button" onclick="pickPost('${esc(p.serial)}')" class="px-2 py-1 bg-white border border-indigo-200 hover:bg-indigo-100 rounded-lg text-xs">${esc(p.serial)}. ${esc(p.name)}</button>`).join('');
-  const sn2 = $('serial').value.trim().replace(/[০-৯]/g, d => '০১২৩৪৫৬৭৮৯'.indexOf(d));
-  if (sn2) pickPost(sn2); else $('rmsg').textContent = posts.length + 'টি পদ পাওয়া গেছে, নিচ থেকে বেছে নিন বা ক্রমিক নং লিখুন';
-}
-function pickPost(sn) {
-  const p = (circular.posts || []).find(x => String(x.serial).trim() === String(sn).trim());
-  if (!p) { $('rmsg').textContent = 'ক্রমিক ' + sn + ' পাওয়া যায়নি, নিচের বোতাম থেকে বেছে নিন'; return; }
-  const set = (k, v) => { if (v) fld(k).value = v; };
-  set('প্রতিষ্ঠান', circular.org); set('পদ', p.name); set('গ্রেড', p.grade); set('বেতন', p.salary);
-  set('শূন্যপদ', p.vacancies); set('ফি', p.fee); set('শেষ তারিখ', circular.deadline); 
-  set('কোথা থেকে আবেদন', circular.applyUrl);
-  set('লিংক', circular.applyUrl);
-  $('rmsg').textContent = '✅ বসানো হয়েছে। একবার মিলিয়ে দেখুন, User ID দিয়ে সংরক্ষণ করুন';
-}
-
-// ===== drag & drop =====
-function showPicked() {
-  const f = pickedFile;
-  $('dropTxt').innerHTML = f ? '📄 <b>' + esc(f.name) + '</b> (' + (f.size / 1024 / 1024).toFixed(1) + ' MB)' : 'PDF / ছবি এখানে <b>টেনে এনে ছাড়ুন</b> অথবা চাপ দিয়ে বেছে নিন';
-}
-function setFile(f) {
-  if (!f) return;
-  if (!/pdf|image/.test(f.type)) { $('rmsg').textContent = 'শুধু PDF বা ছবি দিন'; return; }
-  pickedFile = f; showPicked(); readCircular();
-}
-$('file').addEventListener('change', e => setFile(e.target.files[0]));
-['dragenter', 'dragover'].forEach(ev => $('drop').addEventListener(ev, e => {
-  e.preventDefault(); $('drop').classList.add('bg-indigo-100', 'border-indigo-600');
-}));
-['dragleave', 'drop'].forEach(ev => $('drop').addEventListener(ev, e => {
-  e.preventDefault(); $('drop').classList.remove('bg-indigo-100', 'border-indigo-600');
-}));
-
-const hideOv = () => { $('ov').classList.add('hidden'); $('ov').classList.remove('flex'); };
-const loggedIn = () => !$('app').classList.contains('hidden');
-const needNew = () => $('jobModal').classList.contains('hidden') || editId;
-window.addEventListener('dragenter', e => {
-  e.preventDefault();
-  if (loggedIn() && e.dataTransfer && [...e.dataTransfer.types].includes('Files')) { $('ov').classList.remove('hidden'); $('ov').classList.add('flex'); }
-});
-window.addEventListener('dragleave', e => { if (!e.relatedTarget) hideOv(); });
-window.addEventListener('dragover', e => e.preventDefault());
-window.addEventListener('drop', e => {
-  e.preventDefault(); hideOv();
-  const f = e.dataTransfer && e.dataTransfer.files[0];
-  if (!f || !loggedIn()) return;
-  if (needNew()) openAdd();
-  setFile(f);
-});
-document.addEventListener('paste', e => {
-  const f = e.clipboardData && e.clipboardData.files[0];
-  if (!f || !loggedIn()) return;
-  if (needNew()) openAdd();
-  setFile(f);
-});
-$('serial').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); readCircular(); } });
-
-if (pw) call({action:'list'}).then(d => { if (d.ok) start(d); else sessionStorage.removeItem('jt_pw'); }).catch(() => {});
 </script>
 </body>
 </html>
