@@ -87,7 +87,7 @@
         <label class="block text-xs font-semibold text-slate-600 mb-1">সার্কুলারের PDF / ছবি দিন, তারপর ক্রমিক নং লিখুন</label>
         <label id="drop" class="block cursor-pointer border-2 border-dashed border-indigo-300 hover:border-indigo-500 bg-white rounded-xl p-4 text-center text-sm text-slate-600 mb-2 transition">
           <i class="fa-solid fa-cloud-arrow-up text-2xl text-indigo-400 block mb-1"></i>
-          <span id="dropTxt">PDF / ছবি এখানে <b>টেনে এনে ছাড়ুন</b> অথবা চাপ দিয়ে বেছে নিন</span>
+          <span id="dropTxt">PDF / ছবি <b>টেনে এনে ছাড়ুন</b>, <b>Ctrl+V</b> দিয়ে পেস্ট করুন, বা চাপ দিয়ে বেছে নিন</span>
           <input id="file" type="file" accept="application/pdf,image/*" class="hidden">
         </label>
         <div class="flex gap-2">
@@ -103,7 +103,7 @@
         <label class="block text-xs font-semibold text-slate-600 mb-1">অ্যাডমিট কার্ড / Applicant's Copy দিন (PDF বা ছবি) - User ID, তারিখ, সময়, কেন্দ্র, রোল নিজে বসে যাবে</label>
         <label id="admDrop" class="block cursor-pointer border-2 border-dashed border-sky-300 hover:border-sky-500 bg-white rounded-xl p-4 text-center text-sm text-slate-600 mb-2 transition">
           <i class="fa-solid fa-id-card text-2xl text-sky-400 block mb-1"></i>
-          <span id="admTxt">অ্যাডমিট/কপি এখানে <b>টেনে এনে ছাড়ুন</b> অথবা চাপ দিয়ে বেছে নিন</span>
+          <span id="admTxt">অ্যাডমিট/কপি <b>টেনে এনে ছাড়ুন</b>, <b>Ctrl+V</b> দিয়ে পেস্ট করুন, বা চাপ দিয়ে বেছে নিন</span>
           <input id="admFile" type="file" accept="application/pdf,image/*" class="hidden">
         </label>
         <div id="admMsg" class="text-xs text-slate-600"></div>
@@ -392,7 +392,7 @@ function openEdit(id) {
   const r = rows.find(x => x.id === id); if (!r) return;
   editId = id; $('mTitle').textContent = 'আবেদন সংশোধন'; $('aiBox').classList.add('hidden'); $('admitBox').classList.remove('hidden');
   document.querySelectorAll('#form [data-k]').forEach(i => i.value = r[i.dataset.k] || '');
-  admitFile = null; $('admFile').value = ''; $('admMsg').textContent = ''; $('admTxt').innerHTML = 'অ্যাডমিট/কপি এখানে <b>টেনে এনে ছাড়ুন</b> অথবা চাপ দিয়ে বেছে নিন';
+  admitFile = null; $('admFile').value = ''; $('admMsg').textContent = ''; $('admTxt').innerHTML = 'অ্যাডমিট/কপি <b>টেনে এনে ছাড়ুন</b>, <b>Ctrl+V</b> দিয়ে পেস্ট করুন, বা চাপ দিয়ে বেছে নিন';
   showModal();
 }
 async function save(e) {
@@ -529,7 +529,7 @@ $('admDrop').addEventListener('drop', e => {
 // ===== drag & drop (সার্কুলার) =====
 function showPicked() {
   const f = pickedFile;
-  $('dropTxt').innerHTML = f ? '📄 <b>' + esc(f.name) + '</b> (' + (f.size / 1024 / 1024).toFixed(1) + ' MB)' : 'PDF / ছবি এখানে <b>টেনে এনে ছাড়ুন</b> অথবা চাপ দিয়ে বেছে নিন';
+  $('dropTxt').innerHTML = f ? '📄 <b>' + esc(f.name) + '</b> (' + (f.size / 1024 / 1024).toFixed(1) + ' MB)' : 'PDF / ছবি <b>টেনে এনে ছাড়ুন</b>, <b>Ctrl+V</b> দিয়ে পেস্ট করুন, বা চাপ দিয়ে বেছে নিন';
 }
 function setFile(f) {
   if (!f) return;
@@ -553,18 +553,25 @@ window.addEventListener('dragenter', e => {
 });
 window.addEventListener('dragleave', e => { if (!e.relatedTarget) hideOv(); });
 window.addEventListener('dragover', e => e.preventDefault());
+// ফাইল কোথায় যাবে: এডিট খোলা থাকলে অ্যাডমিট/কপি হিসেবে পড়বে, নইলে নতুন আবেদনের সার্কুলার হিসেবে
+const editing = () => !$('jobModal').classList.contains('hidden') && !!editId;
+function routeFile(f) {
+  if (editing()) { readAdmit(f); return; }
+  if (needNew()) openAdd();
+  setFile(f);
+}
 window.addEventListener('drop', e => {
   e.preventDefault(); hideOv();
   const f = e.dataTransfer && e.dataTransfer.files[0];
   if (!f || !loggedIn()) return;
-  if (needNew()) openAdd();
-  setFile(f);
+  routeFile(f);
 });
+// স্ক্রিনশট/ছবি/PDF কপি করে Ctrl+V (মোবাইলে পেস্ট) দিলেও বসে যাবে
 document.addEventListener('paste', e => {
   const f = e.clipboardData && e.clipboardData.files[0];
   if (!f || !loggedIn()) return;
-  if (needNew()) openAdd();
-  setFile(f);
+  e.preventDefault();
+  routeFile(f);
 });
 $('serial').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); readCircular(); } });
 
