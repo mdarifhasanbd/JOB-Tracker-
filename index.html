@@ -196,6 +196,18 @@ function safeUrl(u) {
   if (!/^[a-z][a-z0-9+.-]*:/i.test(u) && /^[\w-]+(\.[\w-]+)+(\/|$)/.test(u)) u = 'https://' + u;
   try { const x = new URL(u); return (x.protocol === 'https:' || x.protocol === 'http:') ? x.href : ''; } catch (e) { return ''; }
 }
+// ওয়েবসাইটের মূল নাম (যেমন bhtpa.teletalk.com.bd -> bhtpa)
+function siteCode(u) {
+  u = safeUrl(u); if (!u) return '';
+  try { return new URL(u).hostname.replace(/^www\./i, '').split('.')[0].toLowerCase(); } catch (e) { return ''; }
+}
+// প্রতিষ্ঠানের নামের শেষে (সাইটের নাম) যোগ; আগে থেকে থাকলে আবার যোগ হবে না
+function withCode(org, url) {
+  org = String(org || '').trim(); const c = siteCode(url);
+  if (!org || !c || org.toLowerCase().includes('(' + c + ')')) return org;
+  return org + '(' + c + ')';
+}
+function orgLabel(r) { return withCode(r['প্রতিষ্ঠান'], r['কোথা থেকে আবেদন'] || r['লিংক']); }
 const ERR = {wrong_password:'ভুল পাসওয়ার্ড', too_many_attempts:'অনেকবার ভুল হয়েছে, ১৫ মিনিট পরে চেষ্টা করুন', bad_session:'সেশন শেষ, আবার লগইন করুন'};
 
 async function rawCall(body) {
@@ -251,7 +263,7 @@ function nextStage(r) {
 function render() {
   $('loading').classList.add('hidden');
   const q = $('q').value.trim().toLowerCase(), fs = $('fs').value;
-  const list = rows.filter(r => (!fs || r['স্ট্যাটাস'] === fs) && (!q || (r['প্রতিষ্ঠান'] + ' ' + r['পদ']).toLowerCase().includes(q))).reverse();
+  const list = rows.filter(r => (!fs || r['স্ট্যাটাস'] === fs) && (!q || (orgLabel(r) + ' ' + r['পদ']).toLowerCase().includes(q))).reverse();
 
   const getSerials = (statusArr) => list
     .map((r, idx) => statusArr.includes(r['স্ট্যাটাস']) ? `#${idx + 1}` : null)
@@ -293,7 +305,7 @@ function render() {
     const id = esc(r.id);
     return `<tr class="hover:bg-slate-50">
       <td class="p-3 text-slate-500 font-medium">${i + 1}</td>
-      <td class="p-3 font-semibold">${esc(r['প্রতিষ্ঠান'])}</td>
+      <td class="p-3 font-semibold">${esc(orgLabel(r))}</td>
       <td class="p-3">${postTitleHtml}<div class="text-xs text-slate-500">${esc(r['গ্রেড'] ? 'গ্রেড ' + r['গ্রেড'] : '')}</div></td>
       <td class="p-3 text-slate-600">${bd(r['আবেদনের তারিখ'])}</td>
       <td class="p-3 ${dlWarn}">${bd(r['শেষ তারিখ'])}</td>
@@ -330,7 +342,7 @@ async function setStatus(id, v) {
 function del(id) {
   const r = rows.find(x => x.id === id); if (!r) return;
   delId = id;
-  $('delInfo').textContent = 'মুছতে যাচ্ছেন: ' + (r['প্রতিষ্ঠান'] || '') + ' - ' + (r['পদ'] || '') + '। চালিয়ে যেতে পাসওয়ার্ড দিন।';
+  $('delInfo').textContent = 'মুছতে যাচ্ছেন: ' + (orgLabel(r) || '') + ' - ' + (r['পদ'] || '') + '। চালিয়ে যেতে পাসওয়ার্ড দিন।';
   $('delPw').value = ''; $('delMsg').textContent = '';
   $('delModal').classList.remove('hidden'); $('delModal').classList.add('flex');
   setTimeout(() => $('delPw').focus(), 50);
@@ -356,7 +368,7 @@ function view(id) {
   const item = (t, v) => `<div><span class="text-xs text-slate-500 font-semibold block">${t}</span><p class="text-slate-800">${v || '—'}</p></div>`;
   const lk = safeUrl(r['লিংক']);
   $('dBody').innerHTML =
-    `<div><span class="text-xs text-slate-500 font-semibold block">প্রতিষ্ঠান</span><p class="font-bold text-lg">${esc(r['প্রতিষ্ঠান'])}</p></div>` +
+    `<div><span class="text-xs text-slate-500 font-semibold block">প্রতিষ্ঠান</span><p class="font-bold text-lg">${esc(orgLabel(r))}</p></div>` +
     item('পদ', esc(r['পদ'])) +
     `<div class="grid grid-cols-2 gap-3">${item('গ্রেড', esc(r['গ্রেড']))}${item('বেতন', esc(r['বেতন']))}${item('শূন্যপদ', esc(r['শূন্যপদ']))}${item('ফি', esc(r['ফি']))}</div>` +
     item('কোথা থেকে আবেদন', esc(r['কোথা থেকে আবেদন'])) +
@@ -398,6 +410,7 @@ function openEdit(id) {
 async function save(e) {
   if (e) e.preventDefault();
   const data = {}; document.querySelectorAll('#form [data-k]').forEach(i => data[i.dataset.k] = i.value.trim());
+  data['প্রতিষ্ঠান'] = withCode(data['প্রতিষ্ঠান'], data['কোথা থেকে আবেদন'] || data['লিংক']);
   if (!data['প্রতিষ্ঠান'] && !data['পদ']) { alert('প্রতিষ্ঠান বা পদ লিখুন'); return; }
   $('sbtn').disabled = true; $('sbtn').textContent = 'সেভ হচ্ছে...';
   try {
@@ -459,7 +472,7 @@ function pickPost(sn) {
   const p = (circular.posts || []).find(x => String(x.serial).trim() === String(sn).trim());
   if (!p) { $('rmsg').textContent = 'ক্রমিক ' + sn + ' পাওয়া যায়নি, নিচের বোতাম থেকে বেছে নিন'; return; }
   const set = (k, v) => { if (v) fld(k).value = v; };
-  set('প্রতিষ্ঠান', circular.org); set('পদ', p.name); set('গ্রেড', p.grade); set('বেতন', p.salary);
+  set('প্রতিষ্ঠান', withCode(circular.org, circular.applyUrl)); set('পদ', p.name); set('গ্রেড', p.grade); set('বেতন', p.salary);
   set('শূন্যপদ', p.vacancies); set('ফি', p.fee); set('শেষ তারিখ', circular.deadline);
   const u = safeUrl(circular.applyUrl);
   set('কোথা থেকে আবেদন', u || circular.applyUrl); set('লিংক', u);
@@ -585,7 +598,7 @@ async function openTrash() {
   const list = d.rows.slice().reverse();
   $('trMsg').textContent = list.length ? list.length + 'টি মুছে ফেলা আবেদন (নতুন আগে)' : 'Trash খালি';
   $('trList').innerHTML = list.map(r => `<div class="flex items-center justify-between gap-2 border border-slate-200 rounded-lg p-3">
-    <div class="min-w-0"><div class="font-semibold text-sm truncate">${esc(r['প্রতিষ্ঠান'])}</div>
+    <div class="min-w-0"><div class="font-semibold text-sm truncate">${esc(orgLabel(r))}</div>
       <div class="text-xs text-slate-600 truncate">${esc(r['পদ'])}</div>
       <div class="text-[10px] text-slate-400">মোছা হয়েছে: ${esc(r['মোছার সময়'])}</div></div>
     <button data-restore="${esc(r.id)}" class="shrink-0 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-medium"><i class="fa-solid fa-rotate-left mr-1"></i>ফেরত আনুন</button>
