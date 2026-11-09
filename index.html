@@ -35,10 +35,11 @@
         <p class="text-xs text-indigo-200 hidden sm:block">প্রিলি · লিখিত · ভাইভা সব এক জায়গায়</p></div>
     </div>
     <div class="flex gap-2">
-      <button onclick="openAdd()" class="bg-emerald-500 hover:bg-emerald-600 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
+      <button id="addBtn" onclick="openAdd()" class="bg-emerald-500 hover:bg-emerald-600 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
         <i class="fa-solid fa-plus"></i><span>নতুন আবেদন</span></button>
-      <button onclick="openTrash()" class="bg-indigo-600 hover:bg-indigo-500 px-3 py-2 rounded-lg text-sm" title="Trash (মুছে ফেলা আবেদন ফেরত আনুন)"><i class="fa-solid fa-trash-can-arrow-up"></i></button>
-      <button onclick="logout()" class="bg-indigo-600 hover:bg-indigo-500 px-3 py-2 rounded-lg text-sm" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></button>
+      <button id="shareBtn" onclick="openShare()" class="bg-indigo-600 hover:bg-indigo-500 px-3 py-2 rounded-lg text-sm" title="শুধু-দেখার লিংক শেয়ার করুন"><i class="fa-solid fa-share-nodes"></i></button>
+      <button id="trashBtn" onclick="openTrash()" class="bg-indigo-600 hover:bg-indigo-500 px-3 py-2 rounded-lg text-sm" title="Trash (মুছে ফেলা আবেদন ফেরত আনুন)"><i class="fa-solid fa-trash-can-arrow-up"></i></button>
+      <button id="logoutBtn" onclick="logout()" class="bg-indigo-600 hover:bg-indigo-500 px-3 py-2 rounded-lg text-sm" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></button>
     </div>
   </div>
 </header>
@@ -124,6 +125,26 @@
   <div class="border-4 border-dashed border-white rounded-3xl px-10 py-12 text-center"><i class="fa-solid fa-cloud-arrow-up text-5xl block mb-3"></i>ফাইলটি এখানে ছেড়ে দিন</div>
 </div>
 
+<!-- Share modal -->
+<div id="shModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center z-50 p-3">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+    <div class="bg-indigo-700 px-5 py-3 text-white flex justify-between items-center">
+      <h3 class="text-lg font-bold">শুধু-দেখার লিংক</h3>
+      <button onclick="closeShare()" class="text-indigo-200 hover:text-white text-xl"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="p-5 space-y-3">
+      <p class="text-sm text-slate-600">এই লিংক যার কাছে যাবে সে শুধু দেখতে পারবে কোথায় কোথায় আবেদন করেছেন। কিছু বদলাতে পারবে না। User ID, নোট ও ফি-র তথ্য দেখা যাবে না।</p>
+      <input id="shLink" readonly class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-slate-50" onclick="this.select()">
+      <div id="shMsg" class="text-sm min-h-[20px] text-slate-500"></div>
+      <div class="flex gap-2">
+        <button onclick="copyShare()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg py-2 text-sm font-medium"><i class="fa-regular fa-copy mr-1"></i>কপি</button>
+        <button onclick="newShare()" class="px-3 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-sm font-medium" title="পুরোনো লিংক বন্ধ হয়ে নতুন তৈরি হবে">নতুন লিংক</button>
+        <button onclick="stopShare()" class="px-3 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg text-sm font-medium">বন্ধ করুন</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Details modal -->
 <div id="dModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center z-50 p-3">
   <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[92vh] flex flex-col overflow-hidden">
@@ -186,6 +207,8 @@ const BADGE = {
   'ভাইভা':'bg-orange-100 text-orange-800','নির্বাচিত':'bg-emerald-100 text-emerald-800','বাদ':'bg-rose-100 text-rose-800'
 };
 // পাসওয়ার্ড আর ব্রাউজারে থাকে না; শুধু ৬ ঘণ্টার সেশন-টোকেন
+const SHARE = (location.hash.match(/^#share=([\w-]{40,120})$/) || [])[1] || '';
+const RO = !!SHARE;
 let rows = [], statuses = [], token = sessionStorage.getItem('jt_tok') || '', editId = '', delId = '';
 let circular = null, circularKey = '', pickedFile = null, admitFile = null;
 const $ = id => document.getElementById(id);
@@ -215,6 +238,7 @@ async function rawCall(body) {
   return r.json();
 }
 async function call(body) {
+  if (RO) return rawCall({action:'shared', share: SHARE});
   const d = await rawCall({token, ...body});
   if (d && d.error === 'bad_session') forceLogout('সেশন শেষ, আবার লগইন করুন');
   return d;
@@ -238,7 +262,12 @@ function start(d) {
   rows = d.rows; statuses = d.statuses;
   $('login').classList.add('hidden'); $('app').classList.remove('hidden');
   $('fs').innerHTML = '<option value="">সব স্ট্যাটাস</option>' + statuses.map(s => `<option>${esc(s)}</option>`).join('');
-  buildForm(); render(); bumpIdle();
+  if (RO) {
+    ['addBtn','trashBtn','logoutBtn','shareBtn'].forEach(i => $(i).classList.add('hidden'));
+    document.querySelector('header h1').insertAdjacentHTML('beforeend', ' <span class="text-xs bg-indigo-500 rounded px-2 py-0.5 font-normal">শুধু দেখা</span>');
+    document.title = 'Job Tracker (শুধু দেখা)';
+  } else buildForm();
+  render(); bumpIdle();
 }
 async function logout() {
   try { await call({action:'logout'}); } catch (e) {}
@@ -310,13 +339,15 @@ function render() {
       <td class="p-3 text-slate-600">${bd(r['আবেদনের তারিখ'])}</td>
       <td class="p-3 ${dlWarn}">${bd(r['শেষ তারিখ'])}</td>
       <td class="p-3">${ns ? `<b class="${ns.d <= 3 ? 'text-rose-600' : ''}">${ns.n}</b> · ${bd(ns.s)}<div class="text-xs text-slate-500">${left(ns.d)}</div>` : '<span class="text-slate-400">—</span>'}</td>
-      <td class="p-3"><select data-st="${id}" class="text-xs font-semibold rounded-full px-2 py-1 border-0 ${BADGE[st] || 'bg-slate-100'}">
-        ${statuses.map(s => `<option${s === st ? ' selected' : ''}>${esc(s)}</option>`).join('')}</select></td>
+      <td class="p-3">${RO ? `<span class="inline-block text-xs font-semibold rounded-full px-3 py-1 ${BADGE[st] || 'bg-slate-100'}">${esc(st)}</span>` : `<select data-st="${id}" class="text-xs font-semibold rounded-full px-2 py-1 border-0 ${BADGE[st] || 'bg-slate-100'}">
+        ${statuses.map(s => `<option${s === st ? ' selected' : ''}>${esc(s)}</option>`).join('')}</select>`}</td>
       <td class="p-3 text-center whitespace-nowrap">
         <button data-act="view" data-id="${id}" class="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-md" title="বিস্তারিত"><i class="fa-solid fa-eye"></i></button>
+        ${RO ? '' : `
         <button data-act="admit" data-id="${id}" class="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-md" title="অ্যাডমিট কার্ড / Applicant's Copy আপলোড"><i class="fa-solid fa-id-card"></i></button>
         <button data-act="edit" data-id="${id}" class="p-1.5 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-md" title="এডিট"><i class="fa-solid fa-pen-to-square"></i></button>
         <button data-act="del" data-id="${id}" class="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-md" title="ডিলিট (পাসওয়ার্ড লাগবে)"><i class="fa-solid fa-trash"></i></button>
+        `}
       </td></tr>`;
   }).join('');
 }
@@ -365,14 +396,15 @@ $('delPw').addEventListener('keydown', e => { if (e.key === 'Enter') confirmDele
 
 function view(id) {
   const r = rows.find(x => x.id === id); if (!r) return;
-  const item = (t, v) => `<div><span class="text-xs text-slate-500 font-semibold block">${t}</span><p class="text-slate-800">${v || '—'}</p></div>`;
+  const HIDE = ['User ID', 'ফি', 'ফি জমার শেষ', 'নোট'];
+  const item = (t, v) => RO && HIDE.includes(t) ? '' : `<div><span class="text-xs text-slate-500 font-semibold block">${t}</span><p class="text-slate-800">${v || '—'}</p></div>`;
   const lk = safeUrl(r['লিংক']);
   $('dBody').innerHTML =
     `<div><span class="text-xs text-slate-500 font-semibold block">প্রতিষ্ঠান</span><p class="font-bold text-lg">${esc(orgLabel(r))}</p></div>` +
     item('পদ', esc(r['পদ'])) +
     `<div class="grid grid-cols-2 gap-3">${item('গ্রেড', esc(r['গ্রেড']))}${item('বেতন', esc(r['বেতন']))}${item('শূন্যপদ', esc(r['শূন্যপদ']))}${item('ফি', esc(r['ফি']))}</div>` +
     item('কোথা থেকে আবেদন', esc(r['কোথা থেকে আবেদন'])) +
-    `<div class="grid grid-cols-2 gap-3">${item('আবেদনের তারিখ', bd(r['আবেদনের তারিখ']))}${item('শেষ তারিখ', bd(r['শেষ তারিখ']))}${item('User ID', esc(r['User ID']))}${item('স্ট্যাটাস', esc(r['স্ট্যাটাস']))}</div>` +
+    `<div class="grid grid-cols-2 gap-3">${item('আবেদনের তারিখ', bd(r['আবেদনের তারিখ']))}${item('শেষ তারিখ', bd(r['শেষ তারিখ']))}${RO ? '' : item('User ID', esc(r['User ID']))}${item('স্ট্যাটাস', esc(r['স্ট্যাটাস']))}</div>` +
     item('ফি জমার শেষ', esc(r['ফি জমার শেষ'])) +
     `<div class="grid grid-cols-3 gap-3">${STAGES.map(([n, k]) => item(n, bd(r[k]))).join('')}</div>` +
     item('লিংক', lk ? `<a class="text-indigo-600 underline break-all" target="_blank" rel="noopener noreferrer" href="${esc(lk)}">${esc(lk)}</a>` : esc(r['লিংক'])) +
@@ -558,7 +590,7 @@ $('file').addEventListener('change', e => setFile(e.target.files[0]));
 }));
 
 const hideOv = () => { $('ov').classList.add('hidden'); $('ov').classList.remove('flex'); };
-const loggedIn = () => !$('app').classList.contains('hidden');
+const loggedIn = () => !RO && !$('app').classList.contains('hidden');
 const needNew = () => $('jobModal').classList.contains('hidden') || editId;
 window.addEventListener('dragenter', e => {
   e.preventDefault();
@@ -612,8 +644,43 @@ $('trList').addEventListener('click', async e => {
   else { b.disabled = false; b.textContent = 'ফেরত আনুন'; alert('ফেরত আসেনি: ' + (ERR[d.error] || d.error)); }
 });
 
+// ===== শুধু-দেখার লিংক (শেয়ার) =====
+function shareUrl(t) { return location.origin + location.pathname + '#share=' + t; }
+function closeShare() { $('shModal').classList.add('hidden'); $('shModal').classList.remove('flex'); }
+async function openShare() {
+  $('shModal').classList.remove('hidden'); $('shModal').classList.add('flex');
+  $('shLink').value = ''; $('shMsg').textContent = 'লোড হচ্ছে...';
+  const d = await call({action:'shareGet'});
+  if (!d.ok) { $('shMsg').textContent = 'হয়নি: ' + (ERR[d.error] || d.error); return; }
+  if (d.share) { $('shLink').value = shareUrl(d.share); $('shMsg').textContent = 'লিংকটি চালু আছে'; }
+  else { $('shMsg').textContent = 'শেয়ার বন্ধ আছে। "নতুন লিংক" চাপলে চালু হবে'; }
+}
+async function newShare() {
+  if ($('shLink').value && !confirm('নতুন লিংক বানালে আগের লিংক আর কাজ করবে না। চালিয়ে যাবেন?')) return;
+  const d = await call({action:'shareNew'});
+  if (!d.ok) { $('shMsg').textContent = 'হয়নি: ' + (ERR[d.error] || d.error); return; }
+  $('shLink').value = shareUrl(d.share); $('shMsg').textContent = 'নতুন লিংক তৈরি হয়েছে';
+}
+async function stopShare() {
+  if (!confirm('শেয়ার বন্ধ করলে লিংকটি আর কাজ করবে না। বন্ধ করবেন?')) return;
+  const d = await call({action:'shareStop'});
+  if (!d.ok) { $('shMsg').textContent = 'হয়নি: ' + (ERR[d.error] || d.error); return; }
+  $('shLink').value = ''; $('shMsg').textContent = 'শেয়ার বন্ধ করা হয়েছে';
+}
+async function copyShare() {
+  const v = $('shLink').value; if (!v) return;
+  try { await navigator.clipboard.writeText(v); $('shMsg').textContent = 'কপি হয়েছে ✅'; }
+  catch (e) { $('shLink').select(); $('shMsg').textContent = 'লিংক বেছে নেওয়া হয়েছে, Ctrl+C দিন'; }
+}
+
 // পেজ খুললে আগের সেশন থাকলে সরাসরি ঢোকে
-if (token) call({action:'list'}).then(d => { if (d.ok) start(d); else forceLogout(''); }).catch(() => {});
+if (RO) {
+  $('login').classList.add('hidden');
+  call({}).then(d => {
+    if (d && d.ok) start(d);
+    else { $('login').classList.remove('hidden'); $('msg').textContent = ''; document.querySelector('#login h2').textContent = 'লিংকটি সচল নেই'; document.querySelector('#login input').classList.add('hidden'); document.querySelector('#login button').classList.add('hidden'); }
+  }).catch(() => { $('login').classList.remove('hidden'); document.querySelector('#login h2').textContent = 'সংযোগ হয়নি, পরে চেষ্টা করুন'; document.querySelector('#login input').classList.add('hidden'); document.querySelector('#login button').classList.add('hidden'); });
+} else if (token) call({action:'list'}).then(d => { if (d.ok) start(d); else forceLogout(''); }).catch(() => {});
 </script>
 </body>
 </html>
